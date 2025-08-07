@@ -1,0 +1,1928 @@
+
+===== mark2mind\chains\answer_questions_chain.py =====
+import json
+from typing import Dict, Any, List
+from pathlib import Path
+from pydantic import BaseModel, Field
+from langchain.prompts import PromptTemplate
+from langchain.output_parsers import JsonOutputParser
+from langchain.chains import LLMChain
+from langchain_core.language_models import BaseLanguageModel
+from utils.prompt_loader import load_prompt
+
+
+class AnswerSchema(BaseModel):
+    question: str
+    answer: str
+    element_id: str
+    element_type: str
+
+
+class AnswerQuestionsChain:
+    def __init__(self, llm: BaseLanguageModel):
+        base_prompt = load_prompt("qa_answer")
+
+
+        self.parser = JsonOutputParser(pydantic_object=List[AnswerSchema])
+        format_instructions = self.parser.get_format_instructions()
+
+        self.prompt = PromptTemplate(
+            template=base_prompt.strip() + "\n\n" + format_instructions,
+            input_variables=["markdown_blocks", "questions"]
+        )
+
+        self.chain = LLMChain(llm=llm, prompt=self.prompt)
+
+    def invoke(self, chunk: Dict, questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        input_data = {
+            "markdown_blocks": json.dumps(chunk.get("blocks", []), indent=2, ensure_ascii=False),
+            "questions": json.dumps(questions, indent=2, ensure_ascii=False)
+        }
+        response = self.chain.invoke(input_data)
+        return self.parser.invoke(response["text"])
+
+
+===== mark2mind\chains\generate_chunk_mindmap_chain.py =====
+
+# from langchain.chat_models import ChatOpenAI
+# from mindmap_langchain.chains.generate_chunk_chain import ChunkTreeChain
+
+# llm = ChatOpenAI(model="gpt-4", temperature=0.5)
+# chain = ChunkTreeChain(llm=llm, prompt_path="prompts/prompt1.txt")
+
+# result = chain.invoke(chunk)
+# print(result["tree"])
+# print(result["tags"])
+
+
+import json
+from typing import List, Dict, Any
+from pathlib import Path
+from pydantic import BaseModel, Field
+
+from langchain_core.language_models import BaseLanguageModel
+from langchain.prompts import PromptTemplate
+from langchain.output_parsers import StructuredOutputParser
+from langchain.chains import LLMChain
+from mindmap_langchain.utils.tracing import LocalTracingHandler
+from utils.prompt_loader import load_prompt
+
+
+class TreeOutputSchema(BaseModel):
+    tree: Dict[str, Any] = Field(..., description="Hierarchical mindmap structure")
+    tags: List[str] = Field(..., description="Flat list of semantic keywords")
+
+
+class ChunkTreeChain:
+    """
+    LangChain-compatible class to generate a semantic tree and tag list
+    from a Markdown chunk using structured output parsing.
+    """
+
+    def __init__(self, llm: BaseLanguageModel):
+        # Load your long instructional prompt from file
+        base_prompt = load_prompt("chunk_tree")
+
+
+        # Build output parser
+        self.parser = StructuredOutputParser.from_pydantic(TreeOutputSchema)
+        format_instructions = self.parser.get_format_instructions()
+
+        # Add parsing instructions to the end of the prompt
+        full_prompt = base_prompt.strip() + "\n\n" + format_instructions
+
+        self.prompt = PromptTemplate(
+            template=full_prompt,
+            input_variables=["markdown_blocks"]
+        )
+
+        self.chain = LLMChain(
+            llm=llm,
+            prompt=self.prompt
+        )
+
+    def invoke(self, chunk: Dict) -> Dict[str, Any]:
+        """
+        Run the LLM chain on a single Markdown chunk.
+
+        Returns:
+            {
+                "tree": Dict,
+                "tags": List[str]
+            }
+        """
+        markdown_json = json.dumps(chunk.get("blocks", []), indent=2, ensure_ascii=False)
+        response = self.chain.invoke({"markdown_blocks": markdown_json})
+
+        # Extract and parse the structured result
+        output = self.parser.invoke(response["text"])
+        return output.dict()
+
+
+===== mark2mind\chains\generate_questions_chain.py =====
+import json
+from typing import Dict, Any, List
+from pathlib import Path
+from pydantic import BaseModel, Field
+from langchain.prompts import PromptTemplate
+from langchain.output_parsers import JsonOutputParser
+from langchain.chains import LLMChain
+from langchain_core.language_models import BaseLanguageModel
+from utils.prompt_loader import load_prompt
+
+
+class QuestionSchema(BaseModel):
+    question: str = Field(..., description="Generated question")
+    element_id: str
+    element_type: str
+
+
+class GenerateQuestionsChain:
+    def __init__(self, llm: BaseLanguageModel):
+        base_prompt = load_prompt("qa_generate")
+
+        self.parser = JsonOutputParser(pydantic_object=List[QuestionSchema])
+        format_instructions = self.parser.get_format_instructions()
+
+        self.prompt = PromptTemplate(
+            template=base_prompt.strip() + "\n\n" + format_instructions,
+            input_variables=["markdown_blocks"]
+        )
+
+        self.chain = LLMChain(llm=llm, prompt=self.prompt)
+
+    def invoke(self, chunk: Dict) -> List[Dict[str, Any]]:
+        blocks_json = json.dumps(chunk.get("blocks", []), indent=2, ensure_ascii=False)
+        response = self.chain.invoke({"markdown_blocks": blocks_json})
+        return self.parser.invoke(response["text"])
+
+
+===== mark2mind\chains\map_content_mindmap_chain.py =====
+import json
+from typing import List, Dict, Any
+from pathlib import Path
+from pydantic import BaseModel, Field
+
+from langchain_core.language_models import BaseLanguageModel
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain.output_parsers import JsonOutputParser
+from utils.prompt_loader import load_prompt
+
+
+class ContentRefSchema(BaseModel):
+    element_id: str = Field(..., description="Unique identifier of the content block")
+    element_type: str = Field(..., description="Type of content block (e.g. code, table, text)")
+    element_caption: str = Field(..., description="Human-readable summary or title")
+    target_node_id: str = Field(..., description="Node ID in the tree where this content should be attached")
+
+
+class ContentMappingChain:
+    """
+    LangChain-compatible class to map content blocks to specific nodes in a tree structure.
+    """
+
+    def __init__(self, llm: BaseLanguageModel):
+        # Load prompt template from file
+        base_prompt = load_prompt("map_content")
+
+        # Define output parser
+        self.parser = JsonOutputParser(pydantic_object=List[ContentRefSchema])
+        format_instructions = self.parser.get_format_instructions()
+
+        # Final prompt template
+        full_prompt = base_prompt.strip() + "\n\n" + format_instructions
+
+        self.prompt = PromptTemplate(
+            template=full_prompt,
+            input_variables=["tree", "content_blocks"]
+        )
+
+        self.chain = LLMChain(
+            llm=llm,
+            prompt=self.prompt
+        )
+
+    def invoke(self, tree: Dict[str, Any], blocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Maps Markdown blocks to tree nodes using an LLM.
+
+        Args:
+            tree (Dict): The mindmap tree
+            blocks (List[Dict]): Markdown content blocks
+
+        Returns:
+            List[Dict]: Each item contains element_id, element_type, element_caption, target_node_id
+        """
+        input_data = {
+            "tree": json.dumps(tree, indent=2, ensure_ascii=False),
+            "content_blocks": json.dumps(blocks, indent=2, ensure_ascii=False)
+        }
+        response = self.chain.invoke(input_data)
+        return self.parser.invoke(response["text"])
+
+
+
+===== mark2mind\chains\merge_tree_mindmap_chain.py =====
+import json
+from typing import Dict, Any
+from pathlib import Path
+from pydantic import BaseModel, Field
+
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain_core.language_models import BaseLanguageModel
+from langchain.output_parsers import JsonOutputParser
+from utils.prompt_loader import load_prompt
+
+
+class MergedTreeSchema(BaseModel):
+    tree: Dict[str, Any] = Field(..., description="Merged hierarchical mindmap structure")
+
+
+class TreeMergeChain:
+    """
+    LangChain-compatible class to merge two mindmap trees into one
+    using a prompt template and structured JSON output parsing.
+    """
+
+    def __init__(self, llm: BaseLanguageModel):
+        # Load tree merge prompt template from file
+        base_prompt = load_prompt("merge_tree")
+
+        # Define output parser
+        self.parser = JsonOutputParser(pydantic_object=MergedTreeSchema)
+        format_instructions = self.parser.get_format_instructions()
+
+        # Final prompt with parsing instructions
+        full_prompt = base_prompt.strip() + "\n\n" + format_instructions
+
+        self.prompt = PromptTemplate(
+            template=full_prompt,
+            input_variables=["tree_a", "tree_b"]
+        )
+
+        self.chain = LLMChain(
+            llm=llm,
+            prompt=self.prompt
+        )
+
+    def invoke(self, tree_a: Dict[str, Any], tree_b: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Merge two trees using the LLM and return a structured JSON tree.
+
+        Args:
+            tree_a (Dict): First tree
+            tree_b (Dict): Second tree
+
+        Returns:
+            Dict[str, Any]: Merged tree
+        """
+        input_data = {
+            "tree_a": json.dumps(tree_a, indent=2, ensure_ascii=False),
+            "tree_b": json.dumps(tree_b, indent=2, ensure_ascii=False)
+        }
+        response = self.chain.invoke(input_data)
+        output = self.parser.invoke(response["text"])
+        return output.tree
+
+
+===== mark2mind\chains\refine_tree_mindmap_chain.py =====
+import json
+from typing import Dict, Any
+from pathlib import Path
+from pydantic import BaseModel, Field
+
+from langchain_core.language_models import BaseLanguageModel
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain.output_parsers import JsonOutputParser
+from utils.prompt_loader import load_prompt
+
+
+class RefinedTreeSchema(BaseModel):
+    tree: Dict[str, Any] = Field(..., description="Refined final hierarchical mindmap structure")
+
+
+class TreeRefineChain:
+    """
+    LangChain-compatible class to refine a merged mindmap tree
+    into a cleaner final structure using an LLM and a prompt template.
+    """
+
+    def __init__(self, llm: BaseLanguageModel):
+        # Load the refinement prompt template from file
+        base_prompt = load_prompt("refine_tree")
+
+        # Define structured output parser
+        self.parser = JsonOutputParser(pydantic_object=RefinedTreeSchema)
+        format_instructions = self.parser.get_format_instructions()
+
+        # Append format instructions to the end of the prompt
+        full_prompt = base_prompt.strip() + "\n\n" + format_instructions
+
+        self.prompt = PromptTemplate(
+            template=full_prompt,
+            input_variables=["tree"]
+        )
+
+        self.chain = LLMChain(
+            llm=llm,
+            prompt=self.prompt
+        )
+
+    def invoke(self, tree: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Refine the input tree using the LLM and return the structured output.
+
+        Args:
+            tree (Dict): Merged but unrefined tree structure
+
+        Returns:
+            Dict[str, Any]: Refined tree
+        """
+        input_data = {
+            "tree": json.dumps(tree, indent=2, ensure_ascii=False)
+        }
+        response = self.chain.invoke(input_data)
+        output = self.parser.invoke(response["text"])
+        return output.tree
+
+
+===== mark2mind\prompts\mindmap\content_mapper.txt =====
+You are a **semantic content classifier** for a technical learning system.
+
+Your task is to **assign content blocks** to their most appropriate **semantic node** within a mindmap tree extracted from the same document.
+
+---
+
+## 🎯 OBJECTIVE
+
+For each `content_block`, identify the **most relevant node** in the provided `mindmap_tree`:
+
+* 🧠 Match based on **semantic meaning**, not surface structure or heading location
+* ✅ Assign each block to **one best-fitting node** (even if deeply nested)
+* ❌ Do **not** assign the same block to multiple nodes
+* ❌ Do **not** rely on order or formatting — focus on **conceptual fit**
+
+---
+
+## 🧠 CLASSIFICATION RULES
+
+1. Use only the **content** of each block and the **titles of the mindmap nodes**
+
+2. Each classification must include:
+
+   * `"element_id"`: from the content block
+   * `"element_type"`: `"text"`, `"code"`, `"table"`, `"image"`, etc.
+   * `"element_caption"`: a short, descriptive label for the block’s content
+   * `"target_node_id"`: the `node_id` from the mindmap tree that best fits the block
+
+3. Do **not** include:
+
+   * Raw markdown or content
+   * Node titles (only use the `node_id`)
+   * Metadata not explicitly required
+
+---
+
+## ✅ OUTPUT FORMAT
+
+Return a **JSON array** where each object represents a classification decision:
+
+```json
+[
+  {
+    "element_id": "code_create-ingress_abc123",
+    "element_type": "code",
+    "element_caption": "Defines an Ingress resource with host-based routing",
+    "target_node_id": "ingress-routing"
+  },
+  {
+    "element_id": "table_comparison_xyz456",
+    "element_type": "table",
+    "element_caption": "Compares ClusterIP, NodePort, and LoadBalancer services",
+    "target_node_id": "service-types"
+  }
+]
+```
+
+---
+
+## 📦 INPUT DATA
+
+### 🧭 Mindmap Tree (JSON)
+
+Each node in the tree includes:
+
+* `title`: name of the concept
+* `node_id`: unique identifier used for classification
+* `children`: nested nodes representing subtopics
+
+```json
+{tree}
+```
+
+---
+
+### 📄 Content Blocks (JSON)
+
+Each block includes:
+
+* `element_id`
+* `element_type` (`text`, `code`, `table`, `image`)
+* `markdown`: the actual content
+* `is_atomic`: true if it should be treated as a standalone unit
+
+```json
+{content_blocks}
+```
+
+---
+
+BEGIN CLASSIFICATION NOW.
+
+
+===== mark2mind\prompts\mindmap\mindmap_generator.txt =====
+## 🧠 You are a **Semantic Mindmap Generator**
+
+Your task is to analyze a set of `markdown_blocks` and produce two outputs:
+
+1. A **hierarchical concept tree** representing the deep semantic structure of the content
+2. A list of **semantic tags** capturing the core ideas in flat keyword form (for clustering and comparison)
+
+This mindmap will support **technical learning, review, and visual understanding**.
+
+---
+
+## 🎯 OBJECTIVES
+
+* Extract a **clean, logical hierarchy** of concepts
+* Capture the **key themes** of the chunk using tags
+* Ignore formatting — focus on **meaning, structure, and relationships**
+
+---
+
+## 🧠 MINDMAP RULES
+
+### 🔍 Use Only Provided Content
+
+* ✅ Analyze only the `markdown_blocks`
+* ❌ No external knowledge or assumptions
+* ❌ Do not copy raw content from paragraphs, code, tables, etc.
+
+### 🧱 Build a Meaningful Hierarchy
+
+* ✅ Include: topics, principles, mechanisms, commands, workflows, etc.
+* ❌ Exclude: superficial headings, filler sections, layout artifacts
+
+### ✏️ Write Clear, Compact Node Titles
+
+* ✅ Keep titles short (2–6 words), specific, and conceptual
+* ❌ Avoid full sentences, formatting, or generic labels like "Overview"
+
+### 🧠 Structure Intelligently
+
+* ✅ Use **semantic grouping** to nest related concepts under shared abstractions
+* ✅ Use 2–3 levels of depth (avoid overly flat or deeply nested trees)
+* ✅ Merge or split nodes to improve clarity
+* ❌ Avoid duplication across branches
+
+---
+
+## 🧾 OUTPUT FORMAT
+
+Return a **JSON object** with the following structure:
+
+```json
+{
+  "tree": {
+    "root": "Main Topic",
+    "nodes": [
+      {
+        "title": "Subtopic A",
+        "children": [
+          { "title": "Detail A1" },
+          { "title": "Detail A2" }
+        ]
+      },
+      {
+        "title": "Subtopic B",
+        "children": []
+      }
+    ]
+  },
+  "tags": [
+    "tag1",
+    "tag2",
+    "tag3"
+  ]
+}
+```
+
+### 🔖 `tags` guidelines:
+
+* Include 3–10 short, meaningful keywords or phrases
+* Focus on **core concepts** mentioned in this chunk
+* Avoid generic words like "introduction", "overview", or "section"
+* Tags help group related content across chunks
+
+---
+
+## 🧾 INPUT FORMAT
+
+You will be given:
+
+```json
+{markdown_blocks}
+```
+
+Each item contains:
+
+* `type`: `"paragraph"`, `"code"`, `"heading"`, `"table"`, or `"image"`
+* `element_id`: a unique identifier
+* `markdown`: the raw content
+* `is_atomic`: whether it is a self-contained block
+
+---
+
+## 🚫 DO NOT INCLUDE
+
+* Raw content (text, code, or tables)
+* Metadata or formatting (IDs, markdown syntax, etc.)
+* Escaped characters (e.g., use `→`, not `\\u2192`)
+
+---
+
+### ✅ GOAL
+
+Return the best semantic breakdown of the content:
+
+* A **mindmap tree** of concepts
+* A **flat list of tags** for semantic clustering
+
+---
+
+**BEGIN GENERATION NOW**.
+
+
+===== mark2mind\prompts\mindmap\mindmap_merger.txt =====
+You are a **semantic mindmap refactorer and merger**.
+
+Your task is to **merge two concept hierarchies** — `tree_a` and `tree_b` — into a single, unified semantic structure.
+
+This mindmap will be used for **deep learning, visual organization, and review** of technical knowledge.
+
+---
+
+## 🎯 OBJECTIVE
+
+* **Merge** both trees into one clean, conceptually grouped hierarchy
+* Eliminate redundancy
+* Optimize node grouping and naming for clarity and structure
+
+---
+
+## 🧠 RULES
+
+1. **Use only** the concepts present in `tree_a` and `tree_b`
+2. You **may restructure** freely for semantic optimization:
+
+   * ✅ Rename vague or redundant titles
+   * ✅ Merge duplicate or overlapping concepts
+   * ✅ Split overloaded nodes into clearer subtopics
+   * ✅ Move nodes under better semantic parents
+   * ✅ Reorder nodes for logical learning flow
+
+3. **Node formatting standards**:
+
+   * `"title"`: short, clear concept label (2–6 words)
+   * `"children"`: nested subtopics or components (empty array if none)
+   * ❌ No copied summaries, markdown, or metadata
+
+---
+
+## 🔁 STRATEGY
+
+* Focus on **semantic clarity and grouping**, not original order
+* Treat similar or identical topics from both trees as mergeable
+* Ensure that each node fits logically into the final structure
+
+---
+
+## 📦 INPUT
+
+You are given:
+
+* `tree_a`: a structured concept hierarchy (JSON)
+* `tree_b`: another concept hierarchy to merge in (JSON)
+
+---
+
+## ✅ OUTPUT FORMAT
+
+Return the final, merged mindmap tree in this format:
+
+```json
+{
+  "root": "Main Topic",
+  "nodes": [
+    {
+      "title": "Refactored or Merged Concept",
+      "children": [
+        { "title": "Subtopic A" },
+        { "title": "Subtopic B" }
+      ]
+    }
+  ]
+}
+````
+
+* ✅ Rename or reorder nodes freely
+* ✅ Maintain clear conceptual hierarchy and consistency
+* ❌ Do not include summaries, copied content, or metadata
+
+---
+
+### 🌲 TREE A
+
+```json
+{tree_a}
+```
+
+---
+
+### 🌲 TREE B
+
+```json
+{tree_b}
+```
+
+---
+
+BEGIN SEMANTIC MERGING NOW.
+
+```
+
+===== mark2mind\prompts\mindmap\mindmap_refiner.txt =====
+You are a **semantic mindmap editor** for technical content derived from structured documents (e.g., books, Markdown files, technical manuals).
+
+Your task is to **refactor a concept tree** (mindmap) into a structure that is:
+
+* 🧠 **Semantically accurate**
+* 📐 **Cleanly structured**
+* ⚖️ **Mid-depth and teachable**
+
+This mindmap should retain essential detail while avoiding fragmentation or overwhelming depth.
+
+*“Before restructuring, **classify all nodes** into high-level groups (e.g., Concepts, Syntax, Examples, Architecture, Use Cases, Commands, Configuration, etc.). Use this classification to build your mid-level hierarchy.”*
+
+---
+
+## 🎯 OBJECTIVE
+
+Transform the input tree by:
+
+1. 🧠 **Merging** redundant or synonymous nodes
+2. 📦 **Grouping** flat or overly granular lists into **mid-level conceptual clusters**
+3. 🧭 **Relocating** misplaced items to semantically accurate parents
+4. 🧹 **Consolidating** low-value details into meaningful categories
+
+> Prioritize clarity, semantic depth, and learnability.
+
+---
+
+## ⚖️ STRUCTURE GUIDELINES
+
+| Rule                           | Target                                                                                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔢 Max Depth                   | 3 levels preferred; 4 only when conceptually necessary                                                                                             |
+| ➕ Max Siblings per Node        | ≤6 preferred — split into logical subgroups if ≥7                                                                                                  |
+| 📏 Avoid Hyper-Specific Leaves | Instead of standalone details like `"PORT field"` or `"command syntax"`, nest under parents like `"Configuration Fields"` or `"Command Reference"` |
+| 🪄 Prefer Conceptual Clusters  | Group items based on purpose (e.g., “Setup”, “Usage”, “Examples”, “Syntax”, “Architecture”)                                                        |
+
+---
+
+## 🔍 REFINEMENT RULES
+
+### ✅ Use Existing Concepts Only
+
+* ❌ Do **not** introduce new concepts or terminology
+* ✅ You may merge, rename, or group based on shared meaning
+
+### ✅ Prioritize Semantic Grouping
+
+* Organize by conceptual role or function (e.g., purpose, configuration, usage, system design)
+* Prefer semantic cohesion over chapter/source order
+
+### ✅ Preserve Specific Details as Subnodes
+
+* If a leaf is specific but informative, nest it under a descriptive parent instead of deleting or flattening
+
+  * Example: `"--output=json"` → under `"Command Options"` → under `"Command Usage"`
+
+### ✅ Flatten Trivial Nesting
+
+* Remove nodes that only add artificial depth without semantic value
+
+---
+
+## ⚠️ PRESERVATION GUIDELINES
+
+* Do not remove small concepts unless redundant
+* If a node is too specific to group clearly, place it under a fallback like:
+
+  * `"Other Details"`
+  * `"Miscellaneous Configuration"`
+  * `"Additional Notes"`
+
+---
+
+## ✅ OUTPUT FORMAT
+
+Return only the final result in valid JSON:
+
+```json
+{
+  "root": "Main Topic",
+  "nodes": [
+    {
+      "title": "Mid-Level Category",
+      "children": [
+        {
+          "title": "Subtopic or Concept Group",
+          "children": [
+            { "title": "Leaf Concept" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## 📥 INPUT FORMAT
+
+You are given a raw mindmap tree in JSON format:
+
+```json
+{tree}
+```
+
+This may contain:
+
+* Flat concept lists
+* Redundant or synonymous ideas
+* Trivial nesting or overspecific leaves
+
+---
+
+## 🚫 DO NOT INCLUDE
+
+* Descriptions, markdown, explanations, or comments
+* Any invented concepts not in the input
+* Node IDs, metadata, or file references
+
+---
+
+## 🔁 BEGIN SEMANTIC RESTRUCTURING NOW
+
+
+===== mark2mind\prompts\qa\answer_questions.txt =====
+You are a **Kubernetes tutor** answering technical questions extracted from a Markdown-based learning chapter.
+
+---
+
+### 🎯 OBJECTIVE
+
+Answer each question using **only** the provided `markdown_blocks`.
+
+You are allowed to use and combine information from **any block**, not just the one referenced.
+
+Your answers should **teach the concept thoroughly**, and include **full tables, code blocks, or diagrams** when relevant — using proper Markdown formatting.
+
+---
+
+### 🧠 RULES
+
+1. Use **only** the content from the `markdown_blocks` JSON array.
+   - ❌ Do **not** add external knowledge.
+   - ❌ Do **not** fabricate or infer beyond what’s explicitly provided.
+   - ✅ You **may use** all blocks for answering (global context).
+
+2. Each question object includes:
+   - `"question"`: The question string
+   - `"element_id"`: ID of the **target element for placement**
+   - `"element_type"`: One of `text`, `code`, `table`, `image`
+   - `"element_caption"`: (Optional) caption for the answer’s placement context
+
+3. If multiple questions ask the **same thing**, combine them:
+   - Join into a **single merged question**
+   - Use natural phrasing with punctuation or conjunctions (e.g., "and", "or")
+
+   **✔️ Good:**  
+   `"What is an Ingress and how does it route based on hostnames and paths?"`
+
+   **❌ Bad:**  
+   `"questions": ["..."]`
+
+4. If no answer can be found in the content, return this fallback:
+
+```json
+{
+  "question": "...",
+  "answer": "The answer is not found in the provided content.",
+  "element_id": "...",
+  "element_type": "...",
+  "element_caption": "..."
+}
+````
+
+5. Field rules:
+
+   * Use the `element_id`, `element_type`, and `element_caption` from the **first matching question**
+   * Set any missing field to `null`
+   * If input format is malformed, return:
+     `"InputError: Invalid or malformed input format."`
+
+6. 📷 **Rendering and Inclusion Rules for Structural Elements**
+
+If the question references or depends on a `table`, `code`, or `image` block, you MUST include the **entire element** in the `answer` using **proper Markdown format**:
+
+| Element Type | Format                                          | Example           |
+| ------------ | ----------------------------------------------- | ----------------- |
+| `table`      | GitHub-style table                              | See below         |
+| `code`       | Triple backtick fenced block (e.g., \`\`\`bash) | See below         |
+| `image`      | Markdown image syntax                           | `![caption](src)` |
+
+- If the `element_type` is `"image"` and the image has a valid `"src"` field, you **must always include the image in the answer**, even if no explanation is present. Use:
+  ```markdown
+  ![element_caption](src)
+
+
+#### ✅ Examples:
+
+**Table:**
+
+```
+| Host-based example | Path-based example | Backend K8s Service |
+| --- | --- | --- |
+| shield.mcu.com | mcu.com/shield | shield |
+| hydra.mcu.com | mcu.com/hydra | hydra |
+```
+
+**Code:**
+
+```bash
+$ git clone https://github.com/nigelpoulton/TKB.git
+$ git checkout -b 2025 origin/2025
+```
+
+**Image:**
+
+```
+![Cloud Load Balancer Diagram](media/figure8-1.png)
+```
+
+If `src` or `text` is missing, return the fallback message above.
+
+---
+
+### 📥 INPUT FORMAT
+
+You receive two JSON arrays:
+
+#### 1. Markdown Blocks
+
+```json
+{markdown_blocks}
+```
+
+Each block includes:
+
+* `"type"`: One of `heading`, `paragraph`, `code`, `table`, `image`
+* `"element_id"`: Unique block ID
+* `"markdown"`: Rendered Markdown
+* `"text"` or `"src"`: Raw content
+* `"language"` (for `code`): Language name (e.g., "bash")
+
+#### 2. Questions
+
+```json
+{questions}
+```
+
+Each question object includes:
+
+* `"question"`: Question string
+* `"element_id"`: Target block for answer placement
+* `"element_type"`: One of `text`, `code`, `table`, `image`
+* `"element_caption"`: Short label for context (optional)
+
+---
+
+### 📤 OUTPUT FORMAT
+
+Return a strict JSON array of answered question objects:
+
+```json
+[
+  {
+    "question": "Merged and cleaned question string...",
+    "answer": "Answer inferred from any relevant blocks, including full Markdown elements if needed...",
+    "element_id": "...",
+    "element_type": "...",
+    "element_caption": "..."
+  }
+]
+```
+
+* Return only **unique question–answer pairs**
+* Do not include commentary, formatting, or raw lists outside the JSON array
+
+---
+
+### 🚦 BEGIN ANSWERING NOW.
+
+```
+
+===== mark2mind\prompts\qa\generate_questions.txt =====
+You are a **Kubernetes instructor and AI tutor**.  
+Your task is to generate **expert-level questions** based strictly on structured `markdown_blocks`.  
+These questions will be used in a study guide powered by AI.
+
+---
+
+## 🎯 OBJECTIVE
+
+For each block:
+- Use the is_atomic flag to determine how to generate questions:
+  - If is_atomic is true:
+    - Ask at least one question that includes the full block
+    - Phrase questions like:
+      - “Interpret the full table...”
+      - “Explain what this command block does...”
+      - “What does the diagram below illustrate...”
+  - If is_atomic is false:
+    - Ask high-quality reasoning, recall, or synthesis questions
+    - Ensure all core concepts are covered without redundancy
+
+---
+
+## 🧠 RULES
+
+1. You must only use the content inside the `markdown_blocks`.  
+   - ❌ Never add facts not present in the blocks  
+   - ❌ Do not infer from outside knowledge  
+   - ✅ Use all relevant metadata, like `type`, `element_id`, and `markdown`
+
+2. Generate questions **only for meaningful blocks**, such as:
+   - ✅ Paragraphs with real concepts
+   - ✅ All tables, code blocks, and images
+   - ❌ Skip filler text like “Let's take a look…” or empty headers
+
+3. Each generated question must be returned in this **strict JSON format**:
+```json
+{
+  "question": "...",              // Clear, specific, non-redundant
+  "element_id": "...",            // From the block
+  "element_type": "...",          // "code", "table", "image", or "text"
+  "element_caption": "..."        // Clear, descriptive short label (see below)
+}
+```
+
+4. For each block:
+
+### 🧾 text/paragraph
+- Ask **recall, synthesis, reasoning, or explanation** questions
+- Cover **every major idea** in the block
+- Avoid shallow or vague questions
+
+### 🧾 code
+- Ask **step-by-step explanation** or **outcome prediction** questions
+- Always include at least one that requires the **full code to be shown**
+- Use phrases like:
+  - “What does the following script do?”
+  - “Explain each command in this sequence…”
+
+### 🧾 table
+- Ask comparative, analytical, or interpretation questions
+- Always include one question that requires the **full table**
+- Use phrases like:
+  - “Analyze the following table...”
+  - “What pattern can you identify in…”
+
+### 🧾 image
+- Ask **visual interpretation** or diagram-based logic questions
+- Use phrases like:
+  - “What does the diagram illustrate about...”
+  - “How does this image relate to...”
+
+5. For every question:
+   - Use clear academic phrasing
+   - No redundancy
+   - Ensure uniqueness and relevance
+
+---
+
+## 🏷️ element_caption Guidance
+
+Always include a short but specific caption describing the element:
+- Tables: `"Ingress Rules Table"`, `"Service Mapping Grid"`
+- Code: `"Deployment YAML"`, `"Cluster Setup Script"`
+- Images: `"Load Balancer Diagram"`, `"Pod Lifecycle Flowchart"`
+- Text: `"Ingress Concept Explanation"`, `"Networking Overview"`
+
+---
+
+## 📦 INPUT
+
+```json
+{markdown_blocks}
+```
+
+Each block has:
+
+- type: One of paragraph, code, table, or image
+- element_id: A unique ID
+- markdown: The block’s content
+- is_atomic: true if the block is a code, table, or image block; false otherwise
+
+---
+
+## ✅ OUTPUT
+
+Return a **JSON array** of question objects.  
+Each question must strictly follow the format and rules.
+
+```json
+[
+  {
+    "question": "What does the table below reveal about ingress routing and backend service mapping?",
+    "element_id": "table_host-based-example-path-based-example-ba_dfe08726",
+    "element_type": "table",
+    "element_caption": "Ingress Routing Table"
+  },
+  {
+    "question": "Explain what happens when running the following full command sequence to prepare the Git repo.",
+    "element_id": "code_git-clone-https-github-com-nigelpoulton-_8eb0b024",
+    "element_type": "code",
+    "element_caption": "Git Clone Setup Script"
+  }
+]
+```
+
+---
+
+BEGIN GENERATION NOW.
+
+
+===== mark2mind\runner\step_runner.py =====
+import json
+import time
+from pathlib import Path
+from typing import List, Dict
+from concurrent.futures import ThreadPoolExecutor
+
+from mindmap_langchain.chains.generate_chunk_chain import ChunkTreeChain
+from mindmap_langchain.chains.merge_tree_chain import TreeMergeChain
+from mindmap_langchain.chains.refine_tree_chain import TreeRefineChain
+from mindmap_langchain.chains.attach_content_chain import ContentMappingChain
+from mindmap_langchain.chains.generate_questions_chain import GenerateQuestionsChain
+from mindmap_langchain.chains.answer_questions_chain import AnswerQuestionsChain
+
+from mindmap_langchain.utils.clustering import cluster_chunk_trees
+from mindmap_langchain.utils.tree_helpers import assign_node_ids, insert_content_refs_into_tree
+from mindmap_langchain.utils.debug import write_debug_file
+from booqmark.chunker.markdown_chunker import chunk_markdown
+
+
+class StepRunner:
+    def __init__(
+        self,
+        input_file: str,
+        file_id: str,
+        steps: List[str],
+        debug: bool,
+        chunk_chain: ChunkTreeChain,
+        merge_chain: TreeMergeChain,
+        refine_chain: TreeRefineChain,
+        content_chain: ContentMappingChain,
+        qa_question_chain: GenerateQuestionsChain,
+        qa_answer_chain: AnswerQuestionsChain,
+        debug_dir: str = "debug",
+        output_dir: str = "output",
+        force: bool = False
+    ):
+        self.file_id = file_id
+        self.steps = steps
+        self.debug = debug
+        self.chunk_chain = chunk_chain
+        self.merge_chain = merge_chain
+        self.refine_chain = refine_chain
+        self.content_chain = content_chain
+        self.qa_question_chain = qa_question_chain
+        self.qa_answer_chain = qa_answer_chain
+        self.force = force
+
+        self.input_file = Path(input_file)
+        self.debug_dir = Path(debug_dir) / file_id
+        self.output_dir = Path(output_dir)
+        self.debug_dir.mkdir(parents=True, exist_ok=True)
+
+        self.text = self.input_file.read_text(encoding="utf-8")
+        self.chunks: List[Dict] = []
+        self.chunk_results: List[Dict] = []
+        self.final_tree: Dict = {}
+
+    def run(self):
+        if "chunk" in self.steps:
+            self.chunk()
+        else:
+            self._load_if_exists("chunks.json", attr="chunks")
+
+        if "qa" in self.steps:
+            self.generate_qa()
+        else:
+            self._load_if_exists("chunks_with_qa.json", attr="chunks")
+
+        if "tree" in self.steps:
+            self.generate_trees()
+
+        if "cluster" in self.steps:
+            self.cluster_chunks()
+
+        if "merge" in self.steps:
+            self.merge_clusters()
+
+        if "refine" in self.steps:
+            self.refine_tree()
+
+        if "map" in self.steps:
+            self.map_content()
+
+        if self.final_tree:
+            out_path = self.output_dir / f"{self.file_id}_mindmap.json"
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(json.dumps(self.final_tree, indent=2, ensure_ascii=False), encoding="utf-8")
+            print(f"✅ Mindmap saved to: {out_path}")
+
+    def chunk(self):
+        print("🔍 Chunking markdown...")
+        self.chunks = chunk_markdown(self.text, max_tokens=1024, debug=self.debug, debug_dir=self.debug_dir)
+        write_debug_file(self.debug_dir / "chunks.json", self.chunks)
+
+    def generate_qa(self):
+        print("🧠 Generating Q&A...")
+
+        def add_qa(idx_chunk):
+            idx, chunk = idx_chunk
+            questions = self.qa_question_chain.invoke(chunk)
+            answers = self.qa_answer_chain.invoke(chunk, questions)
+            id_map = {b["element_id"]: b for b in chunk["blocks"]}
+            for b in chunk["blocks"]:
+                b["qa_pairs"] = []
+            for qa in answers:
+                if (eid := qa.get("element_id")) in id_map:
+                    id_map[eid]["qa_pairs"].append(qa)
+            return idx, chunk
+
+        with ThreadPoolExecutor() as executor:
+            updated = list(executor.map(add_qa, enumerate(self.chunks)))
+        self.chunks = [chunk for _, chunk in sorted(updated)]
+        write_debug_file(self.debug_dir / "chunks_with_qa.json", self.chunks)
+
+    def generate_trees(self):
+        print("🌲 Generating semantic trees...")
+
+        def process(idx_chunk):
+            idx, chunk = idx_chunk
+            try:
+                return self.chunk_chain.invoke(chunk)
+            except Exception as e:
+                print(f"❌ Error on chunk {idx}: {e}")
+                return {"tree": {}, "tags": []}
+
+        with ThreadPoolExecutor() as executor:
+            self.chunk_results = list(executor.map(process, enumerate(self.chunks)))
+        write_debug_file(self.debug_dir / "chunk_trees.json", self.chunk_results)
+
+    def cluster_chunks(self):
+        print("🧠 Clustering chunks...")
+        cluster_count = max(2, len(self.chunk_results) // 4)
+        self.clustered = cluster_chunk_trees(self.chunk_results, cluster_count)
+        write_debug_file(self.debug_dir / "clusters.json", self.clustered)
+
+    def merge_clusters(self):
+        print("🔗 Merging trees within clusters...")
+
+        def merge_group(group):
+            trees = [i["tree"] for i in group if i["tree"]]
+            while len(trees) > 1:
+                merged = []
+                for i in range(0, len(trees), 2):
+                    if i+1 < len(trees):
+                        merged_tree = self.merge_chain.invoke(trees[i], trees[i+1])
+                        merged.append(merged_tree)
+                    else:
+                        merged.append(trees[i])
+                trees = merged
+            return trees[0] if trees else None
+
+        with ThreadPoolExecutor() as executor:
+            trees = list(executor.map(merge_group, self.clustered))
+        self.cluster_trees = [t for t in trees if t]
+        write_debug_file(self.debug_dir / "merged_clusters.json", self.cluster_trees)
+
+    def refine_tree(self):
+        print("🧹 Refining final tree...")
+
+        def merge_all(trees: List[Dict]) -> Dict:
+            while len(trees) > 1:
+                merged = []
+                for i in range(0, len(trees), 2):
+                    if i+1 < len(trees):
+                        merged.append(self.merge_chain.invoke(trees[i], trees[i+1]))
+                    else:
+                        merged.append(trees[i])
+                trees = merged
+            return trees[0]
+
+        merged = merge_all(self.cluster_trees)
+        refined = self.refine_chain.invoke(merged)
+        assign_node_ids(refined)
+        self.final_tree = refined
+        write_debug_file(self.debug_dir / "refined_tree.json", refined)
+
+    def map_content(self):
+        print("📎 Mapping content to final tree...")
+
+        def attach(idx_chunk):
+            idx, chunk = idx_chunk
+            if not chunk["blocks"]:
+                return
+            mapped = self.content_chain.invoke(self.final_tree, chunk["blocks"])
+            insert_content_refs_into_tree(self.final_tree, mapped)
+
+        with ThreadPoolExecutor() as executor:
+            list(executor.map(attach, enumerate(self.chunks)))
+        write_debug_file(self.debug_dir / "final_tree.json", self.final_tree)
+
+    def _load_if_exists(self, filename: str, attr: str):
+        path = self.debug_dir / filename
+        if not self.force and path.exists():
+            with open(path, "r", encoding="utf-8") as f:
+                setattr(self, attr, json.load(f))
+
+===== mark2mind\utils\chunker.py =====
+import json
+import os
+from pathlib import Path
+from typing import List
+from transformers import AutoTokenizer
+from markdown_it import MarkdownIt
+from slugify import slugify
+import uuid
+import spacy
+
+# Load once (globally to avoid reloading per call)
+try:
+    _spacy_nlp = spacy.load("en_core_web_sm")
+except OSError:
+    raise RuntimeError("You must run: python -m spacy download en_core_web_sm")
+
+def semantic_split_spacy(text, max_tokens, tokenizer):
+    doc = _spacy_nlp(text)
+    chunks = []
+    current = ""
+    for sent in doc.sents:
+        proposed = current + " " + sent.text if current else sent.text
+        if len(tokenizer.encode(proposed)) > max_tokens:
+            if current:
+                chunks.append(current.strip())
+            current = sent.text
+        else:
+            current = proposed
+    if current:
+        chunks.append(current.strip())
+    return chunks
+
+def generate_element_id(block, prefix):
+    base = block.get("text", "") or block.get("alt", "") or ""
+    slug = slugify(base)[:4]
+    uid = uuid.uuid4().hex[:8]
+    return f"{prefix}_{slug}_{uid}"
+
+def parse_markdown_as_tree(md_text: str):
+    md = MarkdownIt("gfm-like")
+    tokens = md.parse(md_text)
+
+    root = {"type": "root", "children": []}
+    stack = [(0, root)]  # (level, node)
+    i = 0
+
+    def get_heading_path(stack):
+        return [n["text"] for lvl, n in stack if n["type"] == "heading"]
+
+    def add_child_to_parent(level, block):
+        # Find closest parent with lower level
+        while stack and stack[-1][0] >= level:
+            stack.pop()
+        parent = stack[-1][1]
+        parent.setdefault("children", []).append(block)
+        return parent
+
+    while i < len(tokens):
+        token = tokens[i]
+
+        if token.type == "heading_open":
+            level = int(token.tag[1])
+            heading_text = tokens[i + 1].content.strip()
+            block = {
+                "type": "heading",
+                "level": level,
+                "text": heading_text,
+                "element_id": generate_element_id({"text": heading_text}, "heading"),
+                "children": []
+            }
+            parent = add_child_to_parent(level, block)
+            stack.append((level, block))
+            i += 3
+            block["heading_path"] = get_heading_path(stack)
+
+
+        elif token.type == "paragraph_open":
+            inline_token = tokens[i + 1]
+            if inline_token.type == "inline" and inline_token.children:
+                # Extract image(s)
+                for child in inline_token.children:
+                    if child.type == "image":
+                        block = {
+                            "type": "image",
+                            "alt": child.attrs.get("alt", ""),
+                            "src": child.attrs["src"],
+                            "element_id": generate_element_id(child.attrs, "image")
+                        }
+                        block["heading_path"] = get_heading_path(stack)
+                        stack[-1][1]["children"].append(block)
+                # Extract text
+                text_content = ''.join(c.content for c in inline_token.children if c.type == "text").strip()
+                if text_content:
+                    block = {
+                        "type": "paragraph",
+                        "text": text_content,
+                        "element_id": generate_element_id({"text": text_content}, "paragraph")
+                    }
+                    block["heading_path"] = get_heading_path(stack)
+                    stack[-1][1]["children"].append(block)
+            i += 3
+
+        elif token.type == "inline" and token.children:
+            for child in token.children:
+                if child.type == "image":
+                    block = {
+                        "type": "image",
+                        "alt": child.attrs.get("alt", ""),
+                        "src": child.attrs["src"],
+                        "element_id": generate_element_id(child.attrs, "image")
+                    }
+                    block["heading_path"] = get_heading_path(stack)
+                    stack[-1][1]["children"].append(block)
+            i += 1
+
+        elif token.type == "fence":
+            block = {
+                "type": "code",
+                "language": token.info.strip(),
+                "text": token.content.strip(),
+                "element_id": generate_element_id({"text": token.content}, "code")
+            }
+            block["heading_path"] = get_heading_path(stack)
+            stack[-1][1]["children"].append(block)
+            i += 1
+
+        elif token.type == "table_open":
+            table_tokens = []
+            while i < len(tokens) and tokens[i].type != "table_close":
+                table_tokens.append(tokens[i])
+                i += 1
+            i += 1  # Skip table_close
+
+            # Convert token sequence to markdown string
+            table_md_lines = []
+            row = []
+            is_header = False
+
+            for tok in table_tokens:
+                if tok.type == "thead_open":
+                    is_header = True
+                elif tok.type == "thead_close":
+                    is_header = False
+                    table_md_lines.append("| " + " | ".join(row) + " |")
+                    table_md_lines.append("| " + " | ".join(["---"] * len(row)) + " |")
+                    row = []
+                elif tok.type == "tr_open":
+                    row = []
+                elif tok.type == "tr_close":
+                    if not is_header:
+                        table_md_lines.append("| " + " | ".join(row) + " |")
+                elif tok.type == "inline":
+                    row.append(tok.content.strip())
+
+            table_md = "\n".join(table_md_lines)
+
+            if table_md.strip():
+                block = {
+                    "type": "table",
+                    "text": table_md,
+                    "element_id": generate_element_id({"text": table_md}, "table"),
+                    "heading_path": get_heading_path(stack)
+                }
+                stack[-1][1]["children"].append(block)
+
+
+        else:
+            i += 1
+
+    return root["children"]
+
+def extract_triplets_from_table_tokens(tokens):
+    headers = []
+    rows = []
+    current_row = []
+    collecting_header = False
+    collecting_body = False
+
+    for t in tokens:
+        if t.type == "thead_open":
+            collecting_header = True
+        elif t.type == "thead_close":
+            collecting_header = False
+        elif t.type == "tbody_open":
+            collecting_body = True
+        elif t.type == "tbody_close":
+            collecting_body = False
+        elif t.type == "tr_open":
+            current_row = []
+        elif t.type == "tr_close":
+            if collecting_header:
+                headers = current_row
+            elif collecting_body:
+                rows.append(current_row)
+        elif t.type == "inline":
+            current_row.append(t.content.strip())
+
+    triplet_lines = []
+    for row in rows:
+        row_header = row[0]
+        for i in range(1, len(headers)):
+            if i < len(row):
+                triplet_lines.append(f"{row_header}, {headers[i]} = {row[i]}")
+    return ". ".join(triplet_lines)
+
+
+def block_to_markdown(block):
+    if block["type"] == "heading":
+        return "#" * block["level"] + " " + block["text"]
+    elif block["type"] == "paragraph":
+        return block["text"]
+    elif block["type"] == "image":
+        return f'![{block.get("alt", "")}]({block["src"]})'
+    elif block["type"] == "code":
+        return f'```{block["language"]}\n{block["text"]}\n```'
+    elif block["type"] == "table":
+        return block["text"]
+    return ""
+
+def fallback_semantic_split(text, tokenizer, max_tokens):
+    try:
+        import semchunk
+        sem_chunker = semchunk.chunkerify(tokenizer, chunk_size=max_tokens)
+        return sem_chunker.chunk(text)
+    except ImportError:
+        print("⚠️ 'semchunk' not installed. Falling back to naive split.")
+        return semantic_split_spacy(text, max_tokens, tokenizer)
+
+def chunk_markdown(md_text: str, max_tokens: int = 2000, tokenizer_name: str = "gpt2", debug=False, debug_dir=Path("debug")) -> List[dict]:
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+
+    chunks = []
+    current_chunk = []
+    current_tokens = 0
+    current_headings = {}
+
+    def count_tokens(text):
+        return len(tokenizer.encode(text))
+
+    def get_heading_path():
+        return [v for k, v in sorted(current_headings.items())]
+
+    def is_atomic(block):
+        return block["type"] in {"code", "table", "image"}
+
+    def flatten_blocks_with_paths(tree_blocks):
+        flat = []
+
+        def walk(blocks, heading_path):
+            for block in blocks:
+                if block["type"] == "heading":
+                    new_path = heading_path[:]
+                    new_path.append(block["text"])
+                    block["heading_path"] = new_path
+                    flat.append(block)
+                    walk(block.get("children", []), new_path)
+                else:
+                    block["heading_path"] = heading_path[:]
+                    flat.append(block)
+
+        walk(tree_blocks, [])
+        return flat
+
+
+    def enrich_block(block):
+        block_copy = dict(block)
+        block_copy["markdown"] = block_to_markdown(block)
+        block_copy["token_count"] = count_tokens(block_copy["markdown"])
+        block_copy["is_atomic"] = is_atomic(block)  # 👈 ADD THIS LINE
+        return block_copy
+
+
+    def emit_chunk(blocks):
+        return {
+            "blocks": [enrich_block(b) for b in blocks],
+            "metadata": {
+                "heading_path": get_heading_path(),
+                "token_count": sum(count_tokens(block_to_markdown(b)) for b in blocks),
+            },
+        }
+
+    tree_blocks = parse_markdown_as_tree(md_text)
+    blocks = flatten_blocks_with_paths(tree_blocks)
+
+    for block in blocks:
+        if block["type"] == "heading":
+            level = block["level"]
+            current_headings[level] = block["text"]
+            for l in list(current_headings.keys()):
+                if l > level:
+                    del current_headings[l]
+
+        enriched = enrich_block(block)
+
+        if is_atomic(block) and enriched["token_count"] > max_tokens:
+            chunks.append({
+                "blocks": [enriched],
+                "metadata": {
+                    "heading_path": get_heading_path(),
+                    "token_count": enriched["token_count"],
+                    "is_oversized": True,
+                    "element_type": block["type"],
+                    "reason": f"{block['type']}_too_large",
+                }
+            })
+            continue
+
+        if block["type"] == "paragraph" and enriched["token_count"] > max_tokens:
+            sub_chunks = fallback_semantic_split(enriched["markdown"], tokenizer, max_tokens)
+            for sub in sub_chunks:
+                chunks.append({
+                    "blocks": [{
+                        "type": "paragraph",
+                        "text": sub.strip(),
+                        "markdown": sub.strip(),
+                        "heading_path": get_heading_path(),
+                        "token_count": count_tokens(sub),
+                    }],
+                    "metadata": {
+                        "heading_path": get_heading_path(),
+                        "token_count": count_tokens(sub),
+                        "element_type": "paragraph"
+                    }
+                })
+            continue
+
+        if current_tokens + enriched["token_count"] > max_tokens:
+            if current_chunk:
+                chunks.append(emit_chunk(current_chunk))
+
+                # Token overlap (~200)
+                chunk_overlap_tokens = 200
+                rewind_tokens = 0
+                overlap_chunk = []
+                for b in reversed(current_chunk):
+                    enriched_b = enrich_block(b)
+                    rewind_tokens += enriched_b["token_count"]
+                    overlap_chunk.insert(0, enriched_b)
+                    if rewind_tokens >= chunk_overlap_tokens:
+                        break
+
+                current_chunk = overlap_chunk
+                current_tokens = rewind_tokens
+            else:
+                current_chunk = []
+                current_tokens = 0
+
+        current_chunk.append(enriched)
+        current_tokens += enriched["token_count"]
+
+    if current_chunk:
+        chunks.append(emit_chunk(current_chunk))
+
+    if debug and debug_dir:
+        os.makedirs(debug_dir, exist_ok=True)
+        from collections import Counter
+
+        block_types = Counter()
+        for chunk in chunks:
+            for block in chunk["blocks"]:
+                block_types[block["type"]] += 1
+
+        print(f"🖼️ Images: {block_types['image']}")
+        print(f"📊 Tables: {block_types['table']}")
+        print(f"📄 Paragraphs: {block_types['paragraph']}")
+        print(f"💻 Code blocks: {block_types['code']}")
+
+        # Group all blocks by type
+        grouped_blocks = {"paragraph": [], "image": [], "table": [], "code": []}
+
+        for chunk in chunks:
+            for block in chunk["blocks"]:
+                btype = block["type"]
+                if btype in grouped_blocks:
+                    grouped_blocks[btype].append(block)
+
+        # Save each group into one JSON file
+        for btype, blocks in grouped_blocks.items():
+            file_path = os.path.join(debug_dir, f"{btype}s.json")
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(blocks, f, indent=2, ensure_ascii=False)
+
+        def clean_block(block):
+            return {k: v for k, v in block.items() if k != "children"}
+        
+        for c in chunks:
+            c["blocks"] = [clean_block(b) for b in c["blocks"]]
+
+        all_chunks_path = os.path.join(debug_dir, f"chunks.json")
+        with open(all_chunks_path, "w", encoding="utf-8") as f:
+            json.dump(chunks, f, indent=2, ensure_ascii=False)
+
+    return chunks
+
+===== mark2mind\utils\clustering.py =====
+from typing import List, Dict
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from sklearn.decomposition import TruncatedSVD
+from sklearn.metrics import silhouette_score
+
+def cluster_chunk_trees(chunk_results: List[Dict], n_clusters: int = None) -> List[List[Dict]]:
+    """
+    Cluster chunk results into semantic groups using tags and heading paths.
+
+    If n_clusters is not provided, it is automatically determined using silhouette score.
+
+    Args:
+        chunk_results: List of chunk_result dicts (must include 'tags' and optionally 'metadata.heading_path')
+        n_clusters: Desired number of clusters (optional; if None, will auto-tune)
+
+    Returns:
+        List of clustered groups (each group is a list of chunk_result dicts)
+    """
+    def get_text(item):
+        tags = " ".join(item.get("tags", []))
+        heading = " ".join(item.get("metadata", {}).get("heading_path", []))
+        return f"{heading} {tags}".strip()
+
+    texts = [get_text(item) for item in chunk_results]
+
+    if not any(texts):
+        raise ValueError("No valid text found for clustering.")
+
+    if len(texts) < 2:
+        return [chunk_results]  # Only one cluster needed
+
+    vectorizer = TfidfVectorizer()
+    X = vectorizer.fit_transform(texts)
+
+    # Dimensionality reduction if necessary
+    if X.shape[1] > 100:
+        svd = TruncatedSVD(n_components=50)
+        X_reduced = svd.fit_transform(X)
+    else:
+        X_reduced = X
+
+    # Auto-tune k if not given
+    if n_clusters is None:
+        max_k = min(10, len(texts))  # Limit search space
+        best_k = 2
+        best_score = -1
+
+        for k in range(2, max_k + 1):
+            try:
+                model = KMeans(n_clusters=k, n_init="auto", random_state=42)
+                labels = model.fit_predict(X_reduced)
+                score = silhouette_score(X_reduced, labels)
+                if score > best_score:
+                    best_k = k
+                    best_score = score
+            except Exception:
+                continue  # Handle any failure due to empty clusters, etc.
+
+        n_clusters = best_k
+
+    # Final clustering with best or given k
+    kmeans = KMeans(n_clusters=n_clusters, n_init="auto", random_state=42)
+    labels = kmeans.fit_predict(X_reduced)
+
+    clustered = [[] for _ in range(n_clusters)]
+    for idx, label in enumerate(labels):
+        clustered[label].append(chunk_results[idx])
+
+    return clustered
+
+
+===== mark2mind\utils\debug.py =====
+import json
+from pathlib import Path
+from typing import Any
+
+def write_debug_file(path: Path, data: Any):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+===== mark2mind\utils\prompt_loader.py =====
+from pathlib import Path
+
+PROMPT_REGISTRY = {
+    "chunk_tree": "prompts/mindmap/mindmap_generator.txt",
+    "merge_tree": "prompts/mindmap/mindmap_merger.txt",
+    "refine_tree": "prompts/mindmap/mindmap_refiner.txt",
+    "map_content": "prompts/mindmap/content_mapper.txt",
+    "qa_generate": "prompts/qa/generate_questions.txt",
+    "qa_answer": "prompts/qa/answer_questions.txt",
+}
+
+def load_prompt(key: str) -> str:
+    if key not in PROMPT_REGISTRY:
+        raise ValueError(f"No prompt registered for key: {key}")
+    path = Path(PROMPT_REGISTRY[key])
+    return path.read_text(encoding="utf-8")
+
+
+===== mark2mind\utils\tracing.py =====
+import time
+import json
+from pathlib import Path
+from langchain_core.callbacks.base import BaseCallbackHandler
+from typing import Dict, List, Any, Optional
+
+class LocalTracingHandler(BaseCallbackHandler):
+    def __init__(self, trace_dir: Optional[str] = "debug/traces"):
+        self.logs: List[Dict[str, Any]] = []
+        self.trace_dir = Path(trace_dir)
+        self.trace_dir.mkdir(parents=True, exist_ok=True)
+
+    def on_chain_start(self, serialized, inputs, **kwargs):
+        self._start_time = time.time()
+        self._inputs = inputs
+        self._chain_name = serialized.get("name", "unknown_chain")
+
+    def on_chain_end(self, outputs, **kwargs):
+        elapsed = time.time() - self._start_time
+        log_entry = {
+            "chain_name": self._chain_name,
+            "inputs": self._inputs,
+            "outputs": outputs,
+            "duration_sec": round(elapsed, 3),
+        }
+        self.logs.append(log_entry)
+
+        ts = int(time.time() * 1000)
+        out_path = self.trace_dir / f"{self._chain_name}_{ts}.json"
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(log_entry, f, indent=2, ensure_ascii=False)
+
+    def on_llm_end(self, response, **kwargs):
+        usage = response.llm_output.get("token_usage") if hasattr(response, "llm_output") else None
+        if usage and self.logs:
+            self.logs[-1]["token_usage"] = usage
+
+
+===== mark2mind\utils\tree_helper.py =====
+import hashlib
+from typing import Dict, List, Optional
+from slugify import slugify
+from rich.tree import Tree as RichTree
+
+
+def assign_node_ids(node: Dict) -> None:
+    """
+    Recursively assign unique node IDs based on title.
+    """
+    title = node.get("title", "")
+    base_slug = slugify(title) if title else "untitled"
+    hash_suffix = hashlib.md5(title.encode("utf-8")).hexdigest()[:4]
+    node["node_id"] = f"{base_slug}_{hash_suffix}"
+    for child in node.get("children", []):
+        assign_node_ids(child)
+
+
+def insert_content_refs_into_tree(tree: Dict, mapped_content: List[Dict]) -> None:
+    """
+    Insert content reference metadata into target nodes within the tree.
+    """
+    def find_node(node: Dict, node_id: str) -> Optional[Dict]:
+        if node.get("node_id") == node_id:
+            return node
+        for child in node.get("children", []):
+            result = find_node(child, node_id)
+            if result:
+                return result
+        return None
+
+    for item in mapped_content:
+        target = find_node(tree, item.get("target_node_id"))
+        if target:
+            target.setdefault("content_refs", []).append({
+                "element_id": item["element_id"],
+                "element_type": item["element_type"],
+                "element_caption": item["element_caption"]
+            })
+
+
+def render_tree(node: Dict, rich_tree: Optional[RichTree] = None):
+    """
+    Render a mindmap tree to a rich-style tree output for CLI.
+    """
+    label = f"[bold]{node['title']}[/]"
+    if "node_id" in node:
+        label += f" ([dim]{node['node_id']}[/])"
+    current = rich_tree.add(label) if rich_tree else RichTree(label)
+    for child in node.get("children", []):
+        render_tree(child, current)
+    return current
+
+
+===== mark2mind\main.py =====
+import argparse
+import json
+import os
+from pathlib import Path
+from typing import List, Dict
+from langchain.chat_models import ChatOpenAI
+
+from mindmap_langchain.runner.step_runner import StepRunner  # <- New class you'll create
+from mindmap_langchain.chains.generate_chunk_chain import ChunkTreeChain
+from mindmap_langchain.chains.merge_tree_chain import TreeMergeChain
+from mindmap_langchain.chains.refine_tree_chain import TreeRefineChain
+from mindmap_langchain.chains.attach_content_chain import ContentMappingChain
+from mindmap_langchain.chains.generate_questions_chain import GenerateQuestionsChain
+from mindmap_langchain.chains.answer_questions_chain import AnswerQuestionsChain
+from mindmap_langchain.utils.tracing import LocalTracingHandler
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run semantic mindmap generation with Q&A from Markdown")
+    parser.add_argument("input_file", type=str, help="Path to raw Markdown file")
+    parser.add_argument("file_id", type=str, help="Unique debug/output identifier")
+    parser.add_argument("--steps", type=str, help="Comma-separated steps to run (e.g. chunk,qa,tree,map)", required=True)
+    parser.add_argument("--debug", action="store_true", help="Enable debug output and tracing")
+    parser.add_argument("--force", action="store_true", help="Force re-run of all steps, ignore debug cache")
+    parser.add_argument("--enable-tracing", action="store_true", help="Enable local tracing to debug/traces")
+
+    args = parser.parse_args()
+
+    steps = [s.strip() for s in args.steps.split(",") if s.strip()]
+    tracer = LocalTracingHandler() if args.enable_tracing else None
+    callbacks = [tracer] if tracer else None
+
+    def load_llm() -> ChatOpenAI:
+        return ChatOpenAI(model="gpt-4", temperature=0, callbacks=callbacks)
+
+    llm = load_llm()
+
+    # Initialize LangChain components
+    runner = StepRunner(
+        input_file=args.input_file,
+        file_id=args.file_id,
+        steps=steps,
+        debug=args.debug,
+        chunk_chain=ChunkTreeChain(llm, prompt_path="prompts/prompt1.txt"),
+        merge_chain=TreeMergeChain(llm, prompt_path="prompts/merge.txt"),
+        refine_chain=TreeRefineChain(llm, prompt_path="prompts/refine.txt"),
+        content_chain=ContentMappingChain(llm, prompt_path="prompts/map.txt"),
+        qa_question_chain=GenerateQuestionsChain(llm, prompt_path="prompts/qa_generate.txt"),
+        qa_answer_chain=AnswerQuestionsChain(llm, prompt_path="prompts/qa_answer.txt"),
+        force=args.force
+    )
+
+    runner.run()
+
+
+===== setup.py =====
+EMPTY

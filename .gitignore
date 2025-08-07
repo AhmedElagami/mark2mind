@@ -1,0 +1,67 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+
+# macOS
+.DS_Store
+
+# Jupyter/IPython
+.ipynb_checkpoints/
+
+# VSCode / PyCharm
+.vscode/
+.idea/
+
+# Logs and debug
+*.log
+debug/
+output/
+*.tmp
+*.trace
+*.bak
+
+# Checkpoints or intermediate JSONs
+*.json~
+
+# Model or cache files
+.cache/
+*.ckpt
+*.pt
+*.pth
+
+# LLM tokenization / temp
+*.token_cache
+tokenizer_config.json
+
+# Python distribution
+build/
+dist/
+*.egg-info/
+
+# Prompt artifacts
+*.prompt.txt
+*.prompt.json
+
+# SpaCy models (if downloaded locally)
+**/en_core_web_sm*
+
+# Optional: compiled artifacts
+*.so
+
+# Optional: if you add tests
+.coverage
+htmlcov/
+*.cover
+coverage.xml
+
+# Optional: editor-specific
+*.swp
+*.swo
