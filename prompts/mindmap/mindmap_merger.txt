@@ -52,22 +52,25 @@ You are given:
 
 ## ✅ OUTPUT FORMAT
 
-Return the final, merged mindmap tree in this format:
+Return a **JSON object** with a top-level `tree` key that contains the merged mindmap:
 
 ```json
 {
-  "root": "Main Topic",
-  "nodes": [
-    {
-      "title": "Refactored or Merged Concept",
-      "children": [
-        { "title": "Subtopic A" },
-        { "title": "Subtopic B" }
-      ]
-    }
-  ]
+  "tree": {
+    "title": "Main Topic",
+    "children": [
+      {
+        "title": "Refactored or Merged Concept",
+        "children": [
+          { "title": "Subtopic A", "children": [] },
+          { "title": "Subtopic B", "children": [] }
+        ]
+      }
+    ]
+  }
 }
-````
+
+
 
 * ✅ Rename or reorder nodes freely
 * ✅ Maintain clear conceptual hierarchy and consistency

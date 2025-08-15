@@ -73,26 +73,29 @@ Transform the input tree by:
 
 ## ✅ OUTPUT FORMAT
 
-Return only the final result in valid JSON:
+Return only the final result in valid JSON with a top-level `tree` key:
 
 ```json
 {
-  "root": "Main Topic",
-  "nodes": [
-    {
-      "title": "Mid-Level Category",
-      "children": [
-        {
-          "title": "Subtopic or Concept Group",
-          "children": [
-            { "title": "Leaf Concept" }
-          ]
-        }
-      ]
-    }
-  ]
+  "tree": {
+    "title": "Main Topic",
+    "children": [
+      {
+        "title": "Mid-Level Category",
+        "children": [
+          {
+            "title": "Subtopic or Concept Group",
+            "children": [
+              { "title": "Leaf Concept", "children": [] }
+            ]
+          }
+        ]
+      }
+    ]
+  }
 }
-```
+
+
 
 ---
 

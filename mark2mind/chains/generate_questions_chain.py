@@ -1,35 +1,45 @@
 import json
-from typing import Dict, Any, List
-from pathlib import Path
-from pydantic import BaseModel, Field
-from langchain.prompts import PromptTemplate
-from langchain.output_parsers import JsonOutputParser
-from langchain.chains import LLMChain
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel, Field, RootModel
+
 from langchain_core.language_models import BaseLanguageModel
-from utils.prompt_loader import load_prompt
+from langchain.output_parsers import PydanticOutputParser
+from langchain.prompts import PromptTemplate
+from mark2mind.utils.prompt_loader import load_prompt
 
 
 class QuestionSchema(BaseModel):
     question: str = Field(..., description="Generated question")
     element_id: str
-    element_type: str
+    type: str
+    element_caption: str
+
+
+class QuestionList(RootModel[List[QuestionSchema]]):
+    pass
 
 
 class GenerateQuestionsChain:
-    def __init__(self, llm: BaseLanguageModel):
-        base_prompt = load_prompt("qa_generate")
+    def __init__(self, llm: BaseLanguageModel, callbacks=None):
+        base_prompt = load_prompt("qa_generate").strip()
 
-        self.parser = JsonOutputParser(pydantic_object=List[QuestionSchema])
-        format_instructions = self.parser.get_format_instructions()
+        self.parser = PydanticOutputParser(pydantic_object=QuestionList)
 
-        self.prompt = PromptTemplate(
-            template=base_prompt.strip() + "\n\n" + format_instructions,
-            input_variables=["markdown_blocks"]
+        self.prompt = PromptTemplate.from_template(
+            "{base_prompt}\n\n{format_instructions}\n\nMarkdown blocks (JSON):\n{markdown_blocks}"
+        ).partial(
+            base_prompt=base_prompt,
+            format_instructions=self.parser.get_format_instructions(),
         )
 
-        self.chain = LLMChain(llm=llm, prompt=self.prompt)
+        # Bind callbacks + run_name once
+        self.chain = (self.prompt | llm | self.parser).with_config(
+            run_name="GenerateQuestionsChain",
+            callbacks=callbacks,
+            tags=["mark2mind", "qa"]
+        )
 
-    def invoke(self, chunk: Dict) -> List[Dict[str, Any]]:
+    def invoke(self, chunk: Dict, config: Optional[Dict] = None) -> List[Dict[str, Any]]:
         blocks_json = json.dumps(chunk.get("blocks", []), indent=2, ensure_ascii=False)
-        response = self.chain.invoke({"markdown_blocks": blocks_json})
-        return self.parser.invoke(response["text"])
+        result: QuestionList = self.chain.invoke({"markdown_blocks": blocks_json}, config=config)
+        return [q.model_dump() for q in result.root]

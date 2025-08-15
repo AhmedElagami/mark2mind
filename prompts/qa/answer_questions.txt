@@ -22,7 +22,7 @@ Your answers should **teach the concept thoroughly**, and include **full tables,
 2. Each question object includes:
    - `"question"`: The question string
    - `"element_id"`: ID of the **target element for placement**
-   - `"element_type"`: One of `text`, `code`, `table`, `image`
+   - `"type"`: One of `paragraph`, `code`, `table`, `image`
    - `"element_caption"`: (Optional) caption for the answer’s placement context
 
 3. If multiple questions ask the **same thing**, combine them:
@@ -42,14 +42,14 @@ Your answers should **teach the concept thoroughly**, and include **full tables,
   "question": "...",
   "answer": "The answer is not found in the provided content.",
   "element_id": "...",
-  "element_type": "...",
+  "type": "...",
   "element_caption": "..."
 }
 ````
 
 5. Field rules:
 
-   * Use the `element_id`, `element_type`, and `element_caption` from the **first matching question**
+   * Use the `element_id`, `type`, and `element_caption` from the **first matching question**
    * Set any missing field to `null`
    * If input format is malformed, return:
      `"InputError: Invalid or malformed input format."`
@@ -64,7 +64,7 @@ If the question references or depends on a `table`, `code`, or `image` block, yo
 | `code`       | Triple backtick fenced block (e.g., \`\`\`bash) | See below         |
 | `image`      | Markdown image syntax                           | `![caption](src)` |
 
-- If the `element_type` is `"image"` and the image has a valid `"src"` field, you **must always include the image in the answer**, even if no explanation is present. Use:
+- If the `type` is `"image"` and the image has a valid `"src"` field, you **must always include the image in the answer**, even if no explanation is present. Use:
   ```markdown
   ![element_caption](src)
 
@@ -125,7 +125,7 @@ Each question object includes:
 
 * `"question"`: Question string
 * `"element_id"`: Target block for answer placement
-* `"element_type"`: One of `text`, `code`, `table`, `image`
+* `"type"`: One of `paragraph`, `code`, `table`, `image`
 * `"element_caption"`: Short label for context (optional)
 
 ---
@@ -140,7 +140,7 @@ Return a strict JSON array of answered question objects:
     "question": "Merged and cleaned question string...",
     "answer": "Answer inferred from any relevant blocks, including full Markdown elements if needed...",
     "element_id": "...",
-    "element_type": "...",
+    "type": "...",
     "element_caption": "..."
   }
 ]

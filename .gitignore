@@ -17,13 +17,16 @@ env.bak/
 .ipynb_checkpoints/
 
 # VSCode / PyCharm
-.vscode/
+# .vscode/
 .idea/
 
 # Logs and debug
 *.log
 debug/
 output/
+inputs/
+input/
+outputs/
 *.tmp
 *.trace
 *.bak

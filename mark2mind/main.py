@@ -1,21 +1,23 @@
+from datetime import datetime
+import os
+import uuid
+os.environ["TRANSFORMERS_NO_AVAILABLE_BACKENDS"] = "1"
+
 import argparse
 import json
-import os
 from pathlib import Path
 from typing import List, Dict
-from langchain.chat_models import ChatOpenAI
+from langchain_deepseek import ChatDeepSeek
+from mark2mind.runner.step_runner import StepRunner
+from mark2mind.chains.generate_tree_chain import ChunkTreeChain
+from mark2mind.chains.merge_tree_chain import TreeMergeChain
+from mark2mind.chains.refine_tree_chain import TreeRefineChain
+from mark2mind.chains.map_content_mindmap_chain import ContentMappingChain
+from mark2mind.chains.generate_questions_chain import GenerateQuestionsChain
+from mark2mind.chains.answer_questions_chain import AnswerQuestionsChain
+from mark2mind.utils.tracing import LocalTracingHandler
 
-from mindmap_langchain.runner.step_runner import StepRunner  # <- New class you'll create
-from mindmap_langchain.chains.generate_chunk_chain import ChunkTreeChain
-from mindmap_langchain.chains.merge_tree_chain import TreeMergeChain
-from mindmap_langchain.chains.refine_tree_chain import TreeRefineChain
-from mindmap_langchain.chains.attach_content_chain import ContentMappingChain
-from mindmap_langchain.chains.generate_questions_chain import GenerateQuestionsChain
-from mindmap_langchain.chains.answer_questions_chain import AnswerQuestionsChain
-from mindmap_langchain.utils.tracing import LocalTracingHandler
-
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Run semantic mindmap generation with Q&A from Markdown")
     parser.add_argument("input_file", type=str, help="Path to raw Markdown file")
     parser.add_argument("file_id", type=str, help="Unique debug/output identifier")
@@ -27,27 +29,42 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     steps = [s.strip() for s in args.steps.split(",") if s.strip()]
-    tracer = LocalTracingHandler() if args.enable_tracing else None
+    run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
+    tracer = LocalTracingHandler(base_dir="debug", file_id=args.file_id, run_id=run_id) if args.enable_tracing else None
     callbacks = [tracer] if tracer else None
 
-    def load_llm() -> ChatOpenAI:
-        return ChatOpenAI(model="gpt-4", temperature=0, callbacks=callbacks)
+    def load_llm() -> ChatDeepSeek:
+        os.environ["DEEPSEEK_API_KEY"] = "sk-06a8bbe5dd014a6aac5b4c182c06640e"
+        llm = ChatDeepSeek(
+            model="deepseek-chat",
+            temperature=0.3,
+            max_tokens=8000,
+            timeout=None,
+            max_retries=2,
+        )
+        return llm
 
     llm = load_llm()
 
-    # Initialize LangChain components
     runner = StepRunner(
         input_file=args.input_file,
         file_id=args.file_id,
         steps=steps,
         debug=args.debug,
-        chunk_chain=ChunkTreeChain(llm, prompt_path="prompts/prompt1.txt"),
-        merge_chain=TreeMergeChain(llm, prompt_path="prompts/merge.txt"),
-        refine_chain=TreeRefineChain(llm, prompt_path="prompts/refine.txt"),
-        content_chain=ContentMappingChain(llm, prompt_path="prompts/map.txt"),
-        qa_question_chain=GenerateQuestionsChain(llm, prompt_path="prompts/qa_generate.txt"),
-        qa_answer_chain=AnswerQuestionsChain(llm, prompt_path="prompts/qa_answer.txt"),
-        force=args.force
+        chunk_chain=ChunkTreeChain(llm, callbacks=callbacks),
+        merge_chain=TreeMergeChain(llm, callbacks=callbacks),
+        refine_chain=TreeRefineChain(llm, callbacks=callbacks),
+        content_chain=ContentMappingChain(llm, callbacks=callbacks),
+        qa_question_chain=GenerateQuestionsChain(llm, callbacks=callbacks),
+        qa_answer_chain=AnswerQuestionsChain(llm, callbacks=callbacks),
+        force=args.force,
+        run_id=run_id,
+        llm_factory=load_llm,
+        callbacks=callbacks
     )
 
+
     runner.run()
+
+if __name__ == "__main__":
+    main()

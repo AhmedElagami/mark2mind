@@ -22,7 +22,7 @@ For each `content_block`, identify the **most relevant node** in the provided `m
 2. Each classification must include:
 
    * `"element_id"`: from the content block
-   * `"element_type"`: `"text"`, `"code"`, `"table"`, `"image"`, etc.
+   * `"type"`: `"paragraph"`, `"code"`, `"table"`, `"image"`, etc.
    * `"element_caption"`: a short, descriptive label for the block’s content
    * `"target_node_id"`: the `node_id` from the mindmap tree that best fits the block
 
@@ -42,13 +42,13 @@ Return a **JSON array** where each object represents a classification decision:
 [
   {
     "element_id": "code_create-ingress_abc123",
-    "element_type": "code",
+    "type": "code",
     "element_caption": "Defines an Ingress resource with host-based routing",
     "target_node_id": "ingress-routing"
   },
   {
     "element_id": "table_comparison_xyz456",
-    "element_type": "table",
+    "type": "table",
     "element_caption": "Compares ClusterIP, NodePort, and LoadBalancer services",
     "target_node_id": "service-types"
   }
@@ -78,7 +78,7 @@ Each node in the tree includes:
 Each block includes:
 
 * `element_id`
-* `element_type` (`text`, `code`, `table`, `image`)
+* `type` (`paragraph`, `code`, `table`, `image`)
 * `markdown`: the actual content
 * `is_atomic`: true if it should be treated as a standalone unit
 

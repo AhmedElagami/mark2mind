@@ -37,7 +37,7 @@ For each block:
 {
   "question": "...",              // Clear, specific, non-redundant
   "element_id": "...",            // From the block
-  "element_type": "...",          // "code", "table", "image", or "text"
+  "type": "...",          // "code", "table", "image", or "paragraph"
   "element_caption": "..."        // Clear, descriptive short label (see below)
 }
 ```
@@ -111,13 +111,13 @@ Each question must strictly follow the format and rules.
   {
     "question": "What does the table below reveal about ingress routing and backend service mapping?",
     "element_id": "table_host-based-example-path-based-example-ba_dfe08726",
-    "element_type": "table",
+    "type": "table",
     "element_caption": "Ingress Routing Table"
   },
   {
     "question": "Explain what happens when running the following full command sequence to prepare the Git repo.",
     "element_id": "code_git-clone-https-github-com-nigelpoulton-_8eb0b024",
-    "element_type": "code",
+    "type": "code",
     "element_caption": "Git Clone Setup Script"
   }
 ]
