@@ -9,20 +9,18 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        "langchain>=0.1.16",  # or latest stable tested with your setup
-        "langchain-core>=0.1.20",
+        "langchain",  # or latest stable tested with your setup
+        "langchain-core",
         "langchain-community",
         "langchain-deepseek",
-        "openai>=1.0.0",
-        "pydantic>=2.0.0",
-        "transformers>=4.0.0",
+        "openai",
+        "pydantic",
+        "transformers",
         "markdown-it-py[linkify]",
-        "python-slugify>=8.0.0",
-        "scikit-learn>=1.0.0",
-        "spacy>=3.0.0",
-        "rich>=13.0.0",
-        "tiktoken",
-        "linkify"
+        "python-slugify",
+        "scikit-learn",
+        "spacy",
+        "rich",
     ],
     entry_points={
         "console_scripts": [

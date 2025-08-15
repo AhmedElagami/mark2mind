@@ -6,6 +6,8 @@ from langchain_core.language_models import BaseLanguageModel
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
 from mark2mind.utils.prompt_loader import load_prompt
+from langchain_core.runnables import RunnableLambda
+
 
 
 class QuestionSchema(BaseModel):
@@ -18,13 +20,10 @@ class QuestionSchema(BaseModel):
 class QuestionList(RootModel[List[QuestionSchema]]):
     pass
 
-
 class GenerateQuestionsChain:
     def __init__(self, llm: BaseLanguageModel, callbacks=None):
         base_prompt = load_prompt("qa_generate").strip()
-
         self.parser = PydanticOutputParser(pydantic_object=QuestionList)
-
         self.prompt = PromptTemplate.from_template(
             "{base_prompt}\n\n{format_instructions}\n\nMarkdown blocks (JSON):\n{markdown_blocks}"
         ).partial(
@@ -32,12 +31,15 @@ class GenerateQuestionsChain:
             format_instructions=self.parser.get_format_instructions(),
         )
 
-        # Bind callbacks + run_name once
-        self.chain = (self.prompt | llm | self.parser).with_config(
-            run_name="GenerateQuestionsChain",
+        name_shim = RunnableLambda(lambda x: x).with_config(run_name="GenerateQuestionsChain")
+
+        self.chain = (
+            self.prompt | llm | self.parser | name_shim
+        ).with_config(
             callbacks=callbacks,
-            tags=["mark2mind", "qa"]
+            tags=["mark2mind", "qa", "class:GenerateQuestionsChain"],
         )
+
 
     def invoke(self, chunk: Dict, config: Optional[Dict] = None) -> List[Dict[str, Any]]:
         blocks_json = json.dumps(chunk.get("blocks", []), indent=2, ensure_ascii=False)

@@ -8,6 +8,7 @@ from langchain.prompts import PromptTemplate
 from mark2mind.utils.prompt_loader import load_prompt
 from mark2mind.utils.tree_helper import normalize_tree
 
+from langchain_core.runnables import RunnableLambda
 
 class TreeOutputSchema(BaseModel):
     tree: Dict[str, Any] = Field(..., description="Hierarchical mindmap structure")
@@ -17,9 +18,7 @@ class TreeOutputSchema(BaseModel):
 class ChunkTreeChain:
     def __init__(self, llm: BaseLanguageModel, callbacks=None):
         base_prompt = load_prompt("chunk_tree").strip()
-
         self.parser = PydanticOutputParser(pydantic_object=TreeOutputSchema)
-
         self.prompt = PromptTemplate.from_template(
             "{base_prompt}\n\n{format_instructions}\n\n"
             "Markdown blocks (JSON):\n{markdown_blocks}"
@@ -28,11 +27,15 @@ class ChunkTreeChain:
             format_instructions=self.parser.get_format_instructions(),
         )
 
-        self.chain = (self.prompt | llm | self.parser).with_config(
-            run_name="ChunkTreeChain",
+        name_shim = RunnableLambda(lambda x: x).with_config(run_name="ChunkTreeChain")
+
+        self.chain = (
+            self.prompt | llm | self.parser | name_shim
+        ).with_config(
             callbacks=callbacks,
-            tags=["mark2mind","tree","chunk"]
+            tags=["mark2mind", "tree", "chunk", "class:ChunkTreeChain"],
         )
+
 
     def invoke(self, chunk: Dict, config: Optional[Dict] = None) -> Dict[str, Any]:
         markdown_json = json.dumps(chunk.get("blocks", []), indent=2, ensure_ascii=False)

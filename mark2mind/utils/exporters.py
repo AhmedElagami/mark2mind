@@ -33,14 +33,16 @@ def export_qa_nested_headers(chunks: List[Dict[str, Any]], output_path: str) -> 
             question_prefix = "#" * question_level
 
             for qa in qa_pairs:
-                lines.append(f"\n{question_prefix} Q{question_counter}. {qa['question'].strip()}")
+                # lines.append(f"\n{question_prefix} Q{question_counter}. {qa['question'].strip()}")
+                lines.append(f"\n{question_prefix} {qa['question'].strip()}")
                 answer = (qa.get("answer") or "").strip()
 
                 # Preserve markdown blocks verbatim (code/table/image) vs plain text
                 if answer.startswith("```") or answer.startswith("|") or answer.startswith("![](") or answer.startswith("!["):
                     lines.append(answer)
                 else:
-                    lines.append(f"A: {answer}")
+                    # lines.append(f"A: {answer}")
+                    lines.append(f"{answer}")
 
                 lines.append("")  # spacer
                 question_counter += 1
@@ -54,30 +56,60 @@ def _esc(s: str) -> str:
 
 def _render_content_ref(ref: Dict[str, Any]) -> List[str]:
     """
-    Produce ONLY the original markdown (no captions) in Markmap-friendly form.
+    Render a content_ref for Markmap.
 
     Rules:
-      - Paragraphs: a bullet "- <first line>", extra lines as indented content.
-      - Code/Table/Image: an empty bullet "-" followed by the raw block lines.
+      - Paragraph: bullet text is the paragraph's first line (as before).
+      - Image/Table/Code: bullet shows a caption (element_caption/alt/fallback),
+        and the raw block (image markdown, table, or code fence) is nested under it.
     """
     body = (ref.get("markdown") or "").strip()
-    if not body:
-        return []
+    rtype = (ref.get("type") or "").lower()
+    caption = (ref.get("element_caption") or "").strip()
 
-    is_structural = body.startswith("```") or body.startswith("|") or body.startswith("![")
+    # Helper to keep a readable caption
+    def caption_or_fallback(default: str) -> str:
+        return caption or default
+
     lines: List[str] = []
 
-    if is_structural:
-        # Bullet line without label; raw block lines follow.
-        lines.append("-")
-        lines.extend(body.splitlines())
-    else:
-        # Paragraph text on the bullet; extra lines below.
+    if rtype == "paragraph":
+        if not body:
+            return []
+        parts = body.splitlines()
+        lines.append(f"- {parts[0]}")     # bullet line
+        lines.extend(parts[1:])           # any extra lines as nested text
+        return lines
+
+    if rtype == "image":
+        label = caption_or_fallback("Image")
+        # bullet with caption; raw image markdown on the next lines
+        lines.append(f"- 🖼 {label}")
+        if body:
+            lines.extend(body.splitlines())
+        return lines
+
+    if rtype == "code":
+        label = caption_or_fallback("Code")
+        lines.append(f"- 🧩 {label}")
+        if body:
+            lines.extend(body.splitlines())  # should already be a fenced block
+        return lines
+
+    if rtype == "table":
+        label = caption_or_fallback("Table")
+        lines.append(f"- 📊 {label}")
+        if body:
+            lines.extend(body.splitlines())  # pipe table lines
+        return lines
+
+    # Fallback: treat unknown like a paragraph
+    if body:
         parts = body.splitlines()
         lines.append(f"- {parts[0]}")
         lines.extend(parts[1:])
-
     return lines
+
 
 
 def _walk_node(node: Dict[str, Any], depth: int, out: List[str]) -> None:

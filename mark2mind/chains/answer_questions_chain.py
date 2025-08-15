@@ -6,6 +6,8 @@ from langchain_core.language_models import BaseLanguageModel
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
 from mark2mind.utils.prompt_loader import load_prompt
+from langchain_core.runnables import RunnableLambda
+
 
 
 class AnswerSchema(BaseModel):
@@ -23,9 +25,7 @@ class AnswerList(RootModel[List[AnswerSchema]]):
 class AnswerQuestionsChain:
     def __init__(self, llm: BaseLanguageModel, callbacks=None):
         base_prompt = load_prompt("qa_answer").strip()
-
         self.parser = PydanticOutputParser(pydantic_object=AnswerList)
-
         self.prompt = PromptTemplate.from_template(
             "{base_prompt}\n\n{format_instructions}\n\n"
             "Markdown blocks (JSON):\n{markdown_blocks}\n\n"
@@ -35,12 +35,15 @@ class AnswerQuestionsChain:
             format_instructions=self.parser.get_format_instructions(),
         )
 
-        # One-time bind of callbacks / run metadata
-        self.chain = (self.prompt | llm | self.parser).with_config(
-            run_name="AnswerQuestionsChain",
+        name_shim = RunnableLambda(lambda x: x).with_config(run_name="AnswerQuestionsChain")
+
+        self.chain = (
+            self.prompt | llm | self.parser | name_shim
+        ).with_config(
             callbacks=callbacks,
-            tags=["mark2mind","qa","answer"]
+            tags=["mark2mind", "qa", "answer", "class:AnswerQuestionsChain"],
         )
+
 
     def invoke(self, chunk: Dict, questions: List[Dict[str, Any]], config: Optional[Dict] = None) -> List[Dict[str, Any]]:
         input_data = {

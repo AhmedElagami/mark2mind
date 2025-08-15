@@ -1,0 +1,22 @@
+from __future__ import annotations
+from typing import Dict
+from ..core.context import RunContext
+from ..core.artifacts import ArtifactStore
+from ..core.progress import ProgressReporter
+from mark2mind.utils.chunker import chunk_markdown
+
+class ChunkStage:
+    ARTIFACT = "chunks.json"
+
+    def run(self, ctx: RunContext, store: ArtifactStore, progress: ProgressReporter, *, debug: bool, force: bool) -> RunContext:
+        if not force:
+            loaded = store.load_debug(self.ARTIFACT)
+            if loaded is not None:
+                ctx.chunks = loaded
+                return ctx
+
+        task = progress.start("Chunking markdown", total=1)
+        ctx.chunks = chunk_markdown(ctx.text, max_tokens=1024, debug=debug, debug_dir=store.debug_dir)
+        store.save_debug(self.ARTIFACT, ctx.chunks)
+        progress.advance(task); progress.finish(task)
+        return ctx

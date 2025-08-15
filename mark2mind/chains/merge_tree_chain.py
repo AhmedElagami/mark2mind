@@ -7,18 +7,16 @@ from langchain_core.language_models import BaseLanguageModel
 from langchain.output_parsers import PydanticOutputParser
 from mark2mind.utils.prompt_loader import load_prompt
 from mark2mind.utils.tree_helper import normalize_tree
+from langchain_core.runnables import RunnableLambda
 
 
 class MergedTreeSchema(BaseModel):
     tree: Dict[str, Any] = Field(..., description="Merged hierarchical mindmap structure")
 
-
 class TreeMergeChain:
     def __init__(self, llm: BaseLanguageModel, callbacks=None):
         base_prompt = load_prompt("merge_tree").strip()
-
         self.parser = PydanticOutputParser(pydantic_object=MergedTreeSchema)
-
         self.prompt = PromptTemplate.from_template(
             "{base_prompt}\n\n{format_instructions}\n\n"
             "Tree A (JSON):\n{tree_a}\n\n"
@@ -28,11 +26,15 @@ class TreeMergeChain:
             format_instructions=self.parser.get_format_instructions(),
         )
 
-        self.chain = (self.prompt | llm | self.parser).with_config(
-            run_name="TreeMergeChain",
+        name_shim = RunnableLambda(lambda x: x).with_config(run_name="TreeMergeChain")
+
+        self.chain = (
+            self.prompt | llm | self.parser | name_shim
+        ).with_config(
             callbacks=callbacks,
-            tags=["mark2mind","tree","merge"]
+            tags=["mark2mind", "tree", "merge", "class:TreeMergeChain"],
         )
+
 
     def invoke(self, tree_a: Dict[str, Any], tree_b: Dict[str, Any], config: Optional[Dict] = None) -> Dict[str, Any]:
         payload = {

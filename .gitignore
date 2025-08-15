@@ -68,3 +68,6 @@ coverage.xml
 # Optional: editor-specific
 *.swp
 *.swo
+
+paths.txt
+cleaned.txt

@@ -1,70 +1,110 @@
-from datetime import datetime
-import os
-import uuid
-os.environ["TRANSFORMERS_NO_AVAILABLE_BACKENDS"] = "1"
+from __future__ import annotations
 
 import argparse
-import json
+import os
+import uuid
+from datetime import datetime
 from pathlib import Path
-from typing import List, Dict
+
+# Prevent transformer backend noise (same as before)
+os.environ["TRANSFORMERS_NO_AVAILABLE_BACKENDS"] = "1"
+
 from langchain_deepseek import ChatDeepSeek
-from mark2mind.runner.step_runner import StepRunner
-from mark2mind.chains.generate_tree_chain import ChunkTreeChain
-from mark2mind.chains.merge_tree_chain import TreeMergeChain
-from mark2mind.chains.refine_tree_chain import TreeRefineChain
-from mark2mind.chains.map_content_mindmap_chain import ContentMappingChain
-from mark2mind.chains.generate_questions_chain import GenerateQuestionsChain
-from mark2mind.chains.answer_questions_chain import AnswerQuestionsChain
+
+# NEW imports: pipeline runner + config
+from mark2mind.pipeline.core.config import RunConfig
+from mark2mind.pipeline.runner import StepRunner
+
+# keep your local tracer
 from mark2mind.utils.tracing import LocalTracingHandler
 
-def main():
-    parser = argparse.ArgumentParser(description="Run semantic mindmap generation with Q&A from Markdown")
-    parser.add_argument("input_file", type=str, help="Path to raw Markdown file")
-    parser.add_argument("file_id", type=str, help="Unique debug/output identifier")
-    parser.add_argument("--steps", type=str, help="Comma-separated steps to run (e.g. chunk,qa,tree,map)", required=True)
-    parser.add_argument("--debug", action="store_true", help="Enable debug output and tracing")
-    parser.add_argument("--force", action="store_true", help="Force re-run of all steps, ignore debug cache")
-    parser.add_argument("--enable-tracing", action="store_true", help="Enable local tracing to debug/traces")
 
-    args = parser.parse_args()
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        description="Run semantic mindmap generation with Q&A from Markdown"
+    )
+    p.add_argument("input_file", type=str, help="Path to raw Markdown file")
+    p.add_argument("file_id", type=str, help="Unique debug/output identifier")
+    p.add_argument(
+        "--steps",
+        type=str,
+        required=True,
+        help="Comma-separated steps to run (e.g. chunk,bullets,qa,tree,cluster,merge,refine,map)",
+    )
+    p.add_argument("--debug", action="store_true", help="Enable debug output and tracing")
+    p.add_argument(
+        "--force", action="store_true", help="Force re-run of steps (ignore cached artifacts)"
+    )
+    p.add_argument(
+        "--enable-tracing",
+        action="store_true",
+        help="Enable local tracing to debug/traces",
+    )
+    p.add_argument(
+        "--max-workers",
+        type=int,
+        default=20,
+        help="Optional: ThreadPool max workers (default: library default)",
+    )
+    return p
 
-    steps = [s.strip() for s in args.steps.split(",") if s.strip()]
-    run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
-    tracer = LocalTracingHandler(base_dir="debug", file_id=args.file_id, run_id=run_id) if args.enable_tracing else None
-    callbacks = [tracer] if tracer else None
 
-    def load_llm() -> ChatDeepSeek:
-        os.environ["DEEPSEEK_API_KEY"] = "sk-06a8bbe5dd014a6aac5b4c182c06640e"
-        llm = ChatDeepSeek(
-            model="deepseek-chat",
-            temperature=0.3,
-            max_tokens=8000,
-            timeout=None,
-            max_retries=2,
-        )
-        return llm
+def load_llm() -> ChatDeepSeek:
+    """
+    Factory that returns a fresh LLM client.
+    The pipeline will call this per worker thread to avoid sharing clients across threads.
+    """
+    # Prefer env var; falls back to existing env if set elsewhere
+    # e.g., export DEEPSEEK_API_KEY=sk-...
+    api_key = "sk-06a8bbe5dd014a6aac5b4c182c06640e"
 
-    llm = load_llm()
+    # langchain_deepseek reads key from env, but we set again for clarity
+    os.environ["DEEPSEEK_API_KEY"] = api_key
 
-    runner = StepRunner(
-        input_file=args.input_file,
-        file_id=args.file_id,
-        steps=steps,
-        debug=args.debug,
-        chunk_chain=ChunkTreeChain(llm, callbacks=callbacks),
-        merge_chain=TreeMergeChain(llm, callbacks=callbacks),
-        refine_chain=TreeRefineChain(llm, callbacks=callbacks),
-        content_chain=ContentMappingChain(llm, callbacks=callbacks),
-        qa_question_chain=GenerateQuestionsChain(llm, callbacks=callbacks),
-        qa_answer_chain=AnswerQuestionsChain(llm, callbacks=callbacks),
-        force=args.force,
-        run_id=run_id,
-        llm_factory=load_llm,
-        callbacks=callbacks
+    return ChatDeepSeek(
+        model="deepseek-chat",
+        temperature=0.3,
+        max_tokens=8000,
+        timeout=None,
+        max_retries=2,
     )
 
 
+def main():
+    args = build_parser().parse_args()
+
+    steps = [s.strip() for s in args.steps.split(",") if s.strip()]
+    run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
+
+    tracer = (
+        LocalTracingHandler(base_dir="debug", file_id=args.file_id, run_id=run_id)
+        if args.enable_tracing
+        else None
+    )
+    callbacks = [tracer] if tracer else None
+
+    # Build pipeline config
+    cfg = RunConfig(
+        file_id=args.file_id,
+        input_file=Path(args.input_file),
+        steps=steps,
+        force=args.force,
+    )
+    # allow tuning worker count from CLI
+    cfg.executor_max_workers = args.max_workers
+
+    # Create & run the new StepRunner
+    runner = StepRunner(
+        config=cfg,
+        debug=args.debug,
+        callbacks=callbacks,
+        # give the pipeline a factory so each worker gets its own LLM client
+        llm_factory=load_llm,
+        # we *could* also pass prebuilt chain instances, but with llm_factory that’s unnecessary
+    )
+
     runner.run()
+
 
 if __name__ == "__main__":
     main()

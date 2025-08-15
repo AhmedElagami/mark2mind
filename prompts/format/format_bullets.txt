@@ -5,12 +5,12 @@ Convert the provided chunk into a hierarchical, order-preserving Markdown outlin
 
 Global rules
 - Preserve the original order and hierarchy exactly. Do not reorder, omit, or merge content.
-- Keep headings/subheadings verbatim. If none exist, create minimal pseudo-headings based on natural breaks (“Paragraph 1”, “Paragraph 2”, …); do not invent topic names.
+- Keep headings/subheadings verbatim. If none exist, do not create any — just list bullets.
 - One bullet = one atomic idea. If a sentence has multiple ideas, split into sub-bullets in the same order.
 - Retain all numbers, dates, names, terms, symbols, and units exactly.
 - Do not paraphrase or summarize beyond splitting into atomic bullets.
 - Preserve original numbering for steps/lists (mirror source numbering, e.g., “(3)”).
-- Output must be valid Markdown only.
+- Output must be valid Markdown only. Do not wrap the entire output in code fences, and never add a language tag (e.g., ```markdown) unless the source contains actual code to preserve.
 
 Tables
 - Prefer GitHub-flavored Markdown tables; preserve header row, column order, and row order.

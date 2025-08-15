@@ -25,6 +25,7 @@ try:
 except OSError:
     raise RuntimeError("You must run: python -m spacy download en_core_web_sm")
 
+
 def semantic_split_spacy(text, max_tokens, tokenizer):
     doc = _spacy_nlp(text)
     chunks = []
@@ -44,41 +45,57 @@ def semantic_split_spacy(text, max_tokens, tokenizer):
 def _normalize_for_id(s: str) -> str:
     """
     Normalize text for stable hashing:
+    - convert non-breaking spaces to regular spaces
+    - remove zero-width and BOM characters
     - strip leading/trailing whitespace
     - collapse all internal whitespace to a single space
     """
     if not s:
         return ""
+
+    # Replace non-breaking spaces with regular spaces
+    s = s.replace("\u00A0", " ")
+
+    # Remove zero-width spaces/joiners and BOM
+    s = s.replace("\u200B", "").replace("\u200C", "").replace("\u200D", "").replace("\ufeff", "")
+
+    # Standard strip and collapse
     s = s.strip()
     s = re.sub(r"\s+", " ", s)
+
     return s
+
 
 def _hash8(s: str) -> str:
     return hashlib.sha1(s.encode("utf-8")).hexdigest()[:8]
 
 def generate_element_id(block, prefix, heading_path=None):
-    """
-    Deterministic ID based on content (optionally content + heading path).
-    By default we hash ONLY content so identical elements get the same ID across contexts.
-
-    Set env MARK2MIND_ID_SCOPE to:
-      - "content"         (default) => identical content => same ID
-      - "content+path"    => include heading_path in the hash (keeps duplicates if placed under different headings)
-    """
-    import os
+    import os, uuid
     scope = os.getenv("MARK2MIND_ID_SCOPE", "content")
+    if prefix == "image":
+        scope = os.getenv("MARK2MIND_ID_SCOPE", "content+path")
 
-    # choose the most representative payload per type
-    content = ""
+    # Detect image payloads reliably
+    is_image = False
     if isinstance(block, dict):
-        # tables & paragraphs put text in "text"; code uses "text"; images use "src" (fallback to alt)
-        if block.get("type") == "image":
-            content = block.get("src") or block.get("alt") or ""
-        else:
-            content = block.get("text") or block.get("markdown") or block.get("alt") or ""
+        if block.get("type") == "image" or ("src" in block and "text" not in block and prefix == "image"):
+            is_image = True
+
+    if is_image:
+        src = (block.get("src") or "").strip()
+        alt = (block.get("alt") or "").strip()
+        content = src or alt
+        # Never allow empty content for images
+        if not content:
+            if heading_path:
+                content = " / ".join(heading_path)
+            else:
+                content = uuid.uuid4().hex  # absolute last-resort uniqueness
     else:
-        # in parse() we sometimes pass a small attrs dict for images
-        content = (block.get("src") if isinstance(block, dict) else "") or ""
+        if isinstance(block, dict):
+            content = block.get("text") or block.get("markdown") or block.get("alt") or block.get("src") or ""
+        else:
+            content = ""
 
     norm = _normalize_for_id(content)
 
@@ -88,9 +105,11 @@ def generate_element_id(block, prefix, heading_path=None):
     else:
         payload = norm
 
-    slug = slugify(norm)[:8] or "item"
+    slug_base = norm or prefix  # avoid empty slug
+    slug = slugify(slug_base)[:8] or "item"
     h = _hash8(payload)
     return f"{prefix}_{slug}_{h}"
+
 
 def parse_markdown_as_tree(md_text: str):
     md = MarkdownIt("gfm-like")
@@ -140,9 +159,10 @@ def parse_markdown_as_tree(md_text: str):
                     if child.type == "image":
                         block = {
                             "type": "image",
-                            "alt": child.attrs.get("alt", ""),
+                            "alt": child.content,
                             "src": child.attrs["src"],
-                            "element_id": generate_element_id(child.attrs, "image", heading_path=get_heading_path(stack))
+                            "element_caption": child.content,
+                            "element_id": generate_element_id({"type": "image", "src": child.attrs.get("src", ""), "alt": child.content}, "image", heading_path=get_heading_path(stack))
                         }
                         block["heading_path"] = get_heading_path(stack)
                         stack[-1][1]["children"].append(block)
@@ -163,9 +183,10 @@ def parse_markdown_as_tree(md_text: str):
                 if child.type == "image":
                     block = {
                         "type": "image",
-                        "alt": child.attrs.get("alt", ""),
+                        "alt": child.content,
                         "src": child.attrs["src"],
-                        "element_id": generate_element_id(child.attrs, "image", heading_path=get_heading_path(stack))
+                        "element_caption": child.content,
+                        "element_id": generate_element_id({"type": "image", "src": child.attrs.get("src", ""), "alt": child.content}, "image", heading_path=get_heading_path(stack))
                     }
                     block["heading_path"] = get_heading_path(stack)
                     stack[-1][1]["children"].append(block)
@@ -284,9 +305,14 @@ def chunk_markdown(md_text: str, max_tokens: int = 2000, tokenizer_name: str = "
         b["is_atomic"] = is_atomic(block)
         return b
 
+    def join_markdown(enriched_blocks: list) -> str:
+        # two newlines between blocks keeps headings/paragraphs/code visually separated
+        return "\n\n".join(b.get("markdown", "") for b in enriched_blocks if b.get("markdown"))
+
     def emit_chunk(enriched_blocks: list) -> dict:
         return {
             "blocks": enriched_blocks,
+            "md_text": join_markdown(enriched_blocks),         # <-- add this
             "metadata": {
                 "token_count": sum(b["token_count"] for b in enriched_blocks),
             },
@@ -302,6 +328,7 @@ def chunk_markdown(md_text: str, max_tokens: int = 2000, tokenizer_name: str = "
         if enriched["is_atomic"] and enriched["token_count"] > max_tokens:
             chunks.append({
                 "blocks": [enriched],
+                "md_text": enriched["markdown"],               
                 "metadata": {
                     "token_count": enriched["token_count"],
                     "is_oversized": True,
@@ -316,16 +343,18 @@ def chunk_markdown(md_text: str, max_tokens: int = 2000, tokenizer_name: str = "
             sub_chunks = fallback_semantic_split(enriched["markdown"], tokenizer, max_tokens)
             for sub in sub_chunks:
                 sub_md = sub.strip()
+                sub_block = {
+                    "type": "paragraph",
+                    "text": sub_md,
+                    "markdown": sub_md,
+                    "heading_path": enriched["heading_path"],
+                    "token_count": count_tokens(sub_md),
+                    "is_atomic": False,
+                    "element_id": generate_element_id({"text": sub_md}, "paragraph", heading_path=enriched["heading_path"])
+                }
                 chunks.append({
-                    "blocks": [{
-                        "type": "paragraph",
-                        "text": sub_md,
-                        "markdown": sub_md,
-                        "heading_path": enriched["heading_path"],
-                        "token_count": count_tokens(sub_md),
-                        "is_atomic": False,
-                        "element_id": generate_element_id({"text": sub_md}, "paragraph", heading_path=enriched["heading_path"])
-                    }],
+                    "blocks": [sub_block],
+                    "md_text": sub_md,                          
                     "metadata": {
                         "token_count": count_tokens(sub_md),
                         "type": "paragraph"
@@ -398,3 +427,4 @@ def chunk_markdown(md_text: str, max_tokens: int = 2000, tokenizer_name: str = "
             json.dump(chunks, f, indent=2, ensure_ascii=False)
 
     return chunks
+
