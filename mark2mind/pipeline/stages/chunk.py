@@ -8,7 +8,7 @@ from mark2mind.utils.chunker import chunk_markdown
 class ChunkStage:
     ARTIFACT = "chunks.json"
 
-    def run(self, ctx: RunContext, store: ArtifactStore, progress: ProgressReporter, *, debug: bool, force: bool) -> RunContext:
+    def run(self, ctx: RunContext, max_tokens: int, store: ArtifactStore, progress: ProgressReporter, *, debug: bool, force: bool) -> RunContext:
         if not force:
             loaded = store.load_debug(self.ARTIFACT)
             if loaded is not None:
@@ -16,7 +16,7 @@ class ChunkStage:
                 return ctx
 
         task = progress.start("Chunking markdown", total=1)
-        ctx.chunks = chunk_markdown(ctx.text, max_tokens=1024, debug=debug, debug_dir=store.debug_dir)
+        ctx.chunks = chunk_markdown(ctx.text, max_tokens=max_tokens, debug=debug, debug_dir=store.debug_dir)
         store.save_debug(self.ARTIFACT, ctx.chunks)
         progress.advance(task); progress.finish(task)
         return ctx

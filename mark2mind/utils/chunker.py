@@ -265,7 +265,7 @@ def fallback_semantic_split(text, tokenizer, max_tokens):
     try:
         import semchunk
         sem_chunker = semchunk.chunkerify(tokenizer, chunk_size=max_tokens)
-        return sem_chunker.chunk(text)
+        return sem_chunker(text)
     except ImportError:
         print("⚠️ 'semchunk' not installed. Falling back to naive split.")
         return semantic_split_spacy(text, max_tokens, tokenizer)
@@ -368,7 +368,10 @@ def chunk_markdown(md_text: str, max_tokens: int = 2000, tokenizer_name: str = "
                 chunks.append(emit_chunk(current_chunk))
 
                 # Token overlap (~200) — skip atomic blocks for overlap
-                CHUNK_OVERLAP_TOKENS = 200
+                try:
+                    CHUNK_OVERLAP_TOKENS = int(os.getenv("MARK2MIND_CHUNK_OVERLAP_TOKENS", "0"))
+                except Exception:
+                    CHUNK_OVERLAP_TOKENS = 0
                 rewind_tokens = 0
                 overlap_chunk = []
                 for b in reversed(current_chunk):

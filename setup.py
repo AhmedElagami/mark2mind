@@ -21,6 +21,9 @@ setup(
         "scikit-learn",
         "spacy",
         "rich",
+        "semchunk",
+        "toml",
+        "markdownify"
     ],
     entry_points={
         "console_scripts": [

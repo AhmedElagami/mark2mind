@@ -1,0 +1,52 @@
+[pipeline]
+preset = "detailed_mindmap"
+steps = []
+
+[paths]
+input_file = "output_notes\\output_notes_01_qa_qa.md"
+output_dir = "output_notes"
+debug_dir = "debug"
+file_id = "output_notes_01_mindmap"
+
+[subtitles]
+list_dir = "C:\\Users\\mosta\\Documents\\test_course\\04. Logging & Monitoring"
+file_list = "file_list.txt"
+enable_html = true
+output_md = "converted_notes.md"
+
+[chunk]
+tokenizer_name = "gpt2"
+max_tokens = 1024
+overlap_tokens = 0
+
+[presets.named]
+reformat = ["chunk", "reformat"] # chunk.max_tokens = 3072 
+bullets = ["chunk", "bullets"] # chunk.max_tokens = 1024
+clean_for_map = ["chunk", "clean_for_map"] # chunk.max_tokens = 2048
+qa = ["chunk", "qa"] # chunk.max_tokens = 1024
+mindmap = ["chunk", "tree", "cluster", "merge", "refine"] # chunk.max_tokens = 1024
+detailed_mindmap = ["chunk", "tree", "cluster", "merge", "refine", "map"] # chunk.max_tokens = 1024
+subs_list = ["subs_list"]
+subs_merge = ["subs_merge"]
+
+[llm]
+provider = "deepseek"
+model = "deepseek-chat"
+api_key_env = "DEEPSEEK_API_KEY"
+api_key = "sk-06a8bbe5dd014a6aac5b4c182c06640e"
+temperature = 0.2
+max_tokens = 8000
+timeout = 1000000 
+max_retries = 3
+
+[tracing]
+enabled = true
+traces_dir = "debug/traces"
+
+[runtime]
+force = true
+debug = true
+executor_max_workers = 24
+min_delay_sec = 1
+max_retries = 4
+map_batch_override = 32

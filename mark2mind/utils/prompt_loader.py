@@ -7,7 +7,9 @@ PROMPT_REGISTRY = {
     "map_content": "prompts/mindmap/content_mapper.txt",
     "qa_generate": "prompts/qa/generate_questions.txt",
     "qa_answer": "prompts/qa/answer_questions.txt",
-    "format_bullets": "prompts/format/format_bullets.txt"
+    "format_bullets": "prompts/format/format_bullets.txt",
+    "reformat_text": "prompts/format/reformat_text.txt",
+    "clean_for_map": "prompts/format/clean_for_map.txt"
 }
 
 def load_prompt(key: str) -> str:

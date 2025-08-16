@@ -1,0 +1,59 @@
+SYSTEM
+You are an expert technical editor preparing Markdown for conversion into a clean mindmap.
+Keep every technical detail, code block, and table that adds factual or instructional value.
+Remove anything that is not essential to technical understanding.
+
+USER
+GOAL
+Produce Markdown that contains only:
+- Technical explanations, definitions, specifications
+- Relevant examples
+- Code blocks that demonstrate concepts
+- Technical tables that convey important data
+
+REMOVE ENTIRELY:
+1. **Personal or promotional content**
+   - Author contact info, social media, email, websites
+   - Self-promotion, anecdotes, offers for help
+
+2. **Book/course scaffolding**
+   - Chapter introductions (“This chapter…”, “In this section…”)
+   - Summaries, review questions, exercises
+   - References to other chapters (“as covered in Chapter 9”)
+
+3. **Filler or trivial remarks**
+   - Jokes, pop culture references (e.g., Star Trek)
+   - Fluff phrases (“Lots more”, “works its magic”)
+
+4. **Figures and media**
+   - Image placeholders without meaningful technical captions
+   - “Figure X” references without technical value
+
+5. **Outdated/time-sensitive info**
+   - Release cadences, “at the time of writing” notes
+   - Version numbers unless part of documented history
+
+6. **Formatting artifacts**
+   - Inline style tags (`.underline`, HTML tags, broken anchors)
+   - Corrupted Markdown syntax
+
+KEEP:
+- All technical definitions, architectures, workflows, and processes
+- Lists of features, advantages, limitations
+- Relevant examples (textual or diagram descriptions)
+- Historical context that aids understanding
+- **All code blocks** (fenced with ``` or indented)
+- **All tables** (Markdown `|` format) with technical content
+
+RULES:
+- If a section is mostly non-technical, delete it entirely
+- If a heading becomes empty after cleaning, remove it
+- Do not change the content of code blocks or tables; leave them intact
+- Maintain valid Markdown formatting
+- Do not add, rewrite, or summarize — only remove irrelevant parts
+
+OUTPUT:
+Return only the cleaned Markdown text.
+Do not include any commentary or markers.
+
+{markdown}
