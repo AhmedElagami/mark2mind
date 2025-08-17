@@ -20,7 +20,7 @@ Outputs are automatically organized under:
 
 ```
 
-output/\<run\_name>/
+output/<run_name>/
 
 ```
 
@@ -28,7 +28,7 @@ Debugging and tracing data are stored under:
 
 ```
 
-debug/\<run\_name>/
+debug/<run_name>/
 
 ````
 
@@ -209,7 +209,6 @@ The same pattern works for:
 
 Add a **Recipes** section:
 
-````markdown
 ### 🍳 Recipes (Predefined Workflows)
 
 mark2mind ships with ready-to-use recipes so you don’t have to write configs by hand.
@@ -382,7 +381,7 @@ A: Check `debug/<run_name>/...` for intermediate artifacts; re-run with `--force
 
 ## ✅ Summary
 
-* Use **presets** for quick runs.
+* Use **recipes** or **presets** for quick runs.
 * Use **steps** for custom pipelines.
 * All outputs live in `output/<run_name>/`.
 * Debug/traces in `debug/<run_name>/`.
