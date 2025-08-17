@@ -1,26 +1,40 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
 import os
 from typing import List, Optional
+
 from mark2mind.config_schema import AppConfig
+
 
 @dataclass
 class RunConfig:
-    file_id: str
-    input_file: Path
-    debug_dir: Path = Path("debug")
-    output_dir: Path = Path("output")
+    """
+    v2-min runtime config (resolved from AppConfig).
+
+    WHAT changed:
+    - file_id -> run_name
+    - input file/dir inferred as mode; input_path retained
+    - outputs/debug write under <output_dir>/<run_name>/...
+    """
+    run_name: str
+    input_path: Path
+    is_dir_mode: bool
+
+    debug_root: Path = Path("debug")
+    output_root: Path = Path("output")
+
     steps: List[str] = field(default_factory=lambda: ["chunk", "tree", "cluster", "merge", "refine", "map"])
     run_id: str = "manual"
     force: bool = False
     app: Optional[AppConfig] = None
 
-    # performance / retries
+    # execution knobs
     min_delay_sec: float = float(os.getenv("MARK2MIND_MIN_DELAY_SEC", "0.15"))
     max_retries: int = int(os.getenv("MARK2MIND_MAX_RETRIES", "4"))
-    executor_max_workers: Optional[int] = None  # None => default ThreadPoolExecutor behavior
-    map_batch_override: Optional[int] = None    # from MARK2MIND_MAP_BATCH if set
+    executor_max_workers: Optional[int] = None
+    map_batch_override: Optional[int] = None
 
     def __post_init__(self):
         env_map = os.getenv("MARK2MIND_MAP_BATCH", "").strip().lower()
@@ -28,19 +42,22 @@ class RunConfig:
             self.map_batch_override = int(env_map)
 
     @classmethod
-    def from_app(cls, app: AppConfig, *, file_id: Optional[str] = None, input_file: Optional[Path] = None):
-        paths = app.paths
+    def from_app(cls, app: AppConfig):
+        # Steps from preset if present (steps list wins otherwise handled in main)
         steps = app.pipeline.steps
         if app.pipeline.preset:
-            preset_name = app.pipeline.preset
             preset_map = app.presets.named or {}
-            if preset_name in preset_map:
-                steps = preset_map[preset_name]
+            steps = preset_map.get(app.pipeline.preset, steps)
+
+        input_path = Path(app.io.input)
+        is_dir_mode = input_path.is_dir()
+
         return cls(
-            file_id=file_id or paths.file_id or "run",
-            input_file=input_file or Path(paths.input_file or "input.md"),
-            debug_dir=Path(paths.debug_dir),
-            output_dir=Path(paths.output_dir),
+            run_name=app.io.run_name or input_path.stem,
+            input_path=input_path,
+            is_dir_mode=is_dir_mode,
+            debug_root=Path(app.io.debug_dir),
+            output_root=Path(app.io.output_dir),
             steps=steps,
             force=app.runtime.force,
             min_delay_sec=app.runtime.min_delay_sec,

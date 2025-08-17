@@ -1,29 +1,50 @@
 from __future__ import annotations
+
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 from pathlib import Path
-import json, os
+import json
+import os
+import sys
 
-# Try TOML/YAML if present, but they’re optional
+# --- TOML/YAML loaders (kept simple + deterministic) -------------------------
 try:
     import tomllib as _toml  # Python 3.11+
-except Exception:  # pragma: no cover
+except Exception:
     _toml = None
 try:
-    import toml as _toml_backport  # fallback
-except Exception:  # pragma: no cover
+    import toml as _toml_backport  # Python <=3.10
+except Exception:
     _toml_backport = None
 try:
     import yaml as _yaml
-except Exception:  # pragma: no cover
+except Exception:
     _yaml = None
 
 
-class PathsConfig(BaseModel):
-    input_file: Optional[str] = None
+# =============================================================================
+# v2-min CONFIG MODELS
+# =============================================================================
+
+class IOConfig(BaseModel):
+    """
+    v2-min single I/O section.
+
+    WHY: Unified source of truth for input/output & subtitles options.
+    """
+    # Main entry: file or directory (mode is inferred)
+    input: Optional[str] = None
+
+    # Workspace roots; all artifacts write under <output_dir>/<run_name>/
     output_dir: str = "output"
     debug_dir: str = "debug"
-    file_id: Optional[str] = None
+
+    # Optional; auto-derived from input if omitted
+    run_name: Optional[str] = None
+
+    # Subtitles-only options (effective when input is a directory)
+    manifest: str = "file_list.txt"   # subs_list writes; subs_merge reads
+    include_html: bool = False
 
 
 class ChunkConfig(BaseModel):
@@ -35,8 +56,8 @@ class ChunkConfig(BaseModel):
 class LLMConfig(BaseModel):
     provider: str = "deepseek"
     model: str = "deepseek-chat"
-    api_key_env: str = "DEEPSEEK_API_KEY"  # which env var to read
-    api_key: Optional[str] = None          # optionally set in config, else env
+    api_key_env: str = "DEEPSEEK_API_KEY"
+    api_key: Optional[str] = None
     temperature: float = 0.3
     max_tokens: int = 8000
     timeout: Optional[float] = None
@@ -58,73 +79,178 @@ class RuntimeConfig(BaseModel):
 
 
 class PipelineConfig(BaseModel):
-    steps: List[str] = Field(default_factory=lambda: ["chunk","tree","cluster","merge","refine","map"])
+    steps: List[str] = Field(default_factory=lambda: ["chunk", "tree", "cluster", "merge", "refine", "map"])
     preset: Optional[str] = None
 
-class SubtitlesConfig(BaseModel):
-    # Step 1 (list)
-    list_dir: Optional[str] = None              # root folder to scan
-    file_list: str = "file_list.txt"            # where to write the list
-
-    # Step 2 (merge)
-    output_md: str = "merged_subtitles.md"      # merged markdown path
-
-    # Shared
-    enable_html: bool = False                   # include .html files
 
 class PresetsConfig(BaseModel):
     named: Dict[str, List[str]] = {
-        "reformat": ["chunk","reformat"],
-        "clean_for_map": ["chunk","clean_for_map"],
-        "qa": ["chunk","qa"],
-        "full": ["chunk","tree","cluster","merge","refine","map"],
-        # NEW:
+        "reformat": ["chunk", "reformat"],
+        "bullets": ["chunk", "bullets"],
+        "clean_for_map": ["chunk", "clean_for_map"],
+        "qa": ["chunk", "qa"],
+        "mindmap": ["chunk", "tree", "cluster", "merge", "refine"],
+        "detailed_mindmap": ["chunk", "tree", "cluster", "merge", "refine", "map"],
         "subs_list": ["subs_list"],
         "subs_merge": ["subs_merge"],
     }
 
+
+class PromptsFilesConfig(BaseModel):
+    """
+    Only file-based prompts; keys -> file paths.
+    If missing or file not found, we fall back to built-ins.
+    """
+    __root__: Dict[str, str] = Field(default_factory=dict)
+
+    def get_map(self) -> Dict[str, str]:
+        return dict(self.__root__)
+
+
+class PromptsConfig(BaseModel):
+    files: PromptsFilesConfig = PromptsFilesConfig()
+
+
 class AppConfig(BaseModel):
-    paths: PathsConfig = PathsConfig()
+    """
+    v2-min top-level app config.
+    """
+    io: IOConfig = IOConfig()
     chunk: ChunkConfig = ChunkConfig()
     llm: LLMConfig = LLMConfig()
     tracing: TracingConfig = TracingConfig()
     runtime: RuntimeConfig = RuntimeConfig()
     pipeline: PipelineConfig = PipelineConfig()
     presets: PresetsConfig = PresetsConfig()
-    # NEW:
-    subtitles: SubtitlesConfig = SubtitlesConfig()
+    prompts: PromptsConfig = PromptsConfig()
 
+
+# =============================================================================
+# LOAD & NORMALIZE
+# =============================================================================
 
 def _load_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def load_config(path_like: Optional[str]) -> AppConfig:
-    if not path_like:
-        return AppConfig()
-    p = Path(path_like)
-    if not p.exists():
-        raise FileNotFoundError(f"Config file not found: {path_like}")
+def _warn(msg: str) -> None:
+    print(f"⚠️ {msg}", file=sys.stderr)
 
-    text = _load_text(p)
-    suffix = p.suffix.lower()
-    data = None
 
-    if suffix in (".json",):
-        data = json.loads(text)
-    elif suffix in (".toml",):
+def _info(msg: str) -> None:
+    print(f"ℹ️ {msg}", file=sys.stderr)
+
+
+def _derive_run_name(input_path: Path) -> str:
+    """
+    WHY: mode is inferred; run_name is optional.
+    """
+    if input_path.is_dir():
+        return input_path.name or "run"
+    # file
+    return input_path.stem or "run"
+
+
+def _apply_legacy_mappings(raw: dict) -> dict:
+    """
+    Backwards compatibility layer:
+    - Map [paths] and [subtitles] to v2-min [io].
+    - Map legacy prompt loader (none in config) is fine (we have built-ins).
+    """
+    if not isinstance(raw, dict):
+        return {}
+
+    io = raw.get("io", {}) or {}
+
+    # Map [paths] -> [io]
+    if "paths" in raw:
+        _warn("Legacy section [paths] detected; mapping to [io]. Please upgrade to v2-min.")
+        legacy = raw.get("paths") or {}
+        # input_file -> io.input
+        if "input_file" in legacy and "input" not in io:
+            io["input"] = legacy.get("input_file")
+        # output_dir/debug_dir
+        io.setdefault("output_dir", legacy.get("output_dir", "output"))
+        io.setdefault("debug_dir", legacy.get("debug_dir", "debug"))
+        # file_id -> io.run_name
+        if "file_id" in legacy and "run_name" not in io:
+            io["run_name"] = legacy.get("file_id")
+
+    # Map [subtitles] -> [io] (subtitles-only options)
+    if "subtitles" in raw:
+        _warn("Legacy section [subtitles] detected; mapping to [io]. Please upgrade to v2-min.")
+        subs = raw.get("subtitles") or {}
+        # file_list -> manifest
+        if "file_list" in subs and "manifest" not in io:
+            io["manifest"] = subs.get("file_list")
+        # enable_html -> include_html
+        if "enable_html" in subs and "include_html" not in io:
+            io["include_html"] = bool(subs.get("enable_html", False))
+
+    # Attach back
+    if io:
+        raw["io"] = io
+
+    return raw
+
+
+def _parse_config_text(text: str, suffix: str) -> dict:
+    if suffix == ".json":
+        return json.loads(text)
+    if suffix == ".toml":
         if _toml:
-            data = _toml.loads(text)
-        elif _toml_backport:
-            data = _toml_backport.loads(text)
-        else:
-            raise RuntimeError("TOML requested but no tomllib/toml available. Install 'toml'.")
-    elif suffix in (".yaml", ".yml"):
+            return _toml.loads(text)
+        if _toml_backport:
+            return _toml_backport.loads(text)
+        raise RuntimeError("TOML requested but no tomllib/toml available. Install 'toml'.")
+    if suffix in (".yaml", ".yml"):
         if not _yaml:
             raise RuntimeError("YAML requested but PyYAML not installed. Install 'pyyaml'.")
-        data = _yaml.safe_load(text)
-    else:
-        # default: try JSON
-        data = json.loads(text)
+        return _yaml.safe_load(text)
+    # Default to JSON if unknown
+    return json.loads(text)
 
-    return AppConfig(**(data or {}))
+
+def load_config(path_like: Optional[str]) -> AppConfig:
+    """
+    Loads, applies legacy mappings, and normalizes v2-min config.
+    """
+    raw: dict = {}
+    if path_like:
+        p = Path(path_like)
+        if not p.exists():
+            raise FileNotFoundError(f"Config file not found: {path_like}")
+        text = _load_text(p)
+        raw = _parse_config_text(text, p.suffix.lower())
+    else:
+        # empty == defaults
+        raw = {}
+
+    # Legacy -> v2-min
+    raw = _apply_legacy_mappings(raw)
+
+    # Materialize into AppConfig (so we have defaults)
+    app = AppConfig(**(raw or {}))
+
+    # Validate/normalize I/O
+    if not app.io.input:
+        raise ValueError(
+            "Config error: [io].input is required.\n"
+            "Hint: set it to a Markdown file for mindmap/qa, or a directory for subtitles."
+        )
+
+    input_path = Path(app.io.input)
+    if not input_path.exists():
+        raise FileNotFoundError(f"Input path not found: {app.io.input}")
+
+    # Auto-derive run_name if omitted
+    if not app.io.run_name:
+        app.io.run_name = _derive_run_name(input_path)
+        _info(f"[io].run_name not set → using '{app.io.run_name}'.")
+
+    # Ensure basic strings (just in case)
+    app.io.output_dir = app.io.output_dir or "output"
+    app.io.debug_dir = app.io.debug_dir or "debug"
+    app.io.manifest = app.io.manifest or "file_list.txt"
+
+    return app

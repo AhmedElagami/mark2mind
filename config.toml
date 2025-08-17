@@ -1,52 +1,102 @@
+# =======================================
+# mark2mind CONFIG (v2-min, auto-naming)
+# =======================================
+# This config controls how mark2mind runs.
+# - Choose what to run via [pipeline].
+# - Point to your input via [io].
+# - All outputs are auto-named under: output/<run_name>/...
+# - Prompt texts are linked via files in [prompts.files] (fallbacks built-in).
+
 [pipeline]
-preset = "detailed_mindmap"
-steps = []
+# Either pick a preset (common workflows) OR specify steps manually.
+# If both are set, steps[] wins over preset.
+preset = "detailed_mindmap"   # qa | mindmap | detailed_mindmap | subs_list | subs_merge
+steps  = []                   # e.g. ["chunk","tree","cluster","merge","refine","map"]
 
-[paths]
-input_file = "output_notes\\output_notes_01_qa_qa.md"
-output_dir = "output_notes"
-debug_dir = "debug"
-file_id = "output_notes_01_mindmap"
+[io]
+# === INPUT ===
+# FILE example (Markdown pipelines): set to a .md file
+# input = "notes/intro.md"
 
-[subtitles]
-list_dir = "C:\\Users\\mosta\\Documents\\test_course\\04. Logging & Monitoring"
-file_list = "file_list.txt"
-enable_html = true
-output_md = "converted_notes.md"
+# DIRECTORY example (Subtitles pipelines): set to a folder
+# input = "data/subtitles_course"
+input = "notes/intro.md"
+
+# === OUTPUT WORKSPACE ===
+# Final outputs:   output/<run_name>/...
+# Debug artifacts: debug/<run_name>/...
+output_dir = "output"
+debug_dir  = "debug"
+
+# Optional: name for this run.
+# If omitted → derived automatically:
+#   - file input: file stem (intro.md → "intro")
+#   - folder input: folder name
+# run_name = "intro"
+
+# === SUBTITLES-ONLY OPTIONS ===
+# Effective when [io].input is a directory (subs_list / subs_merge).
+# If manifest is relative → stored inside output/<run_name>/...
+manifest     = "file_list.txt"   # subs_list writes; subs_merge reads
+include_html = true              # include .html along with .srt/.vtt
 
 [chunk]
+# How to split long text into chunks.
 tokenizer_name = "gpt2"
-max_tokens = 1024
+max_tokens     = 1024
 overlap_tokens = 0
 
-[presets.named]
-reformat = ["chunk", "reformat"] # chunk.max_tokens = 3072 
-bullets = ["chunk", "bullets"] # chunk.max_tokens = 1024
-clean_for_map = ["chunk", "clean_for_map"] # chunk.max_tokens = 2048
-qa = ["chunk", "qa"] # chunk.max_tokens = 1024
-mindmap = ["chunk", "tree", "cluster", "merge", "refine"] # chunk.max_tokens = 1024
-detailed_mindmap = ["chunk", "tree", "cluster", "merge", "refine", "map"] # chunk.max_tokens = 1024
-subs_list = ["subs_list"]
-subs_merge = ["subs_merge"]
-
 [llm]
-provider = "deepseek"
-model = "deepseek-chat"
-api_key_env = "DEEPSEEK_API_KEY"
-api_key = "sk-06a8bbe5dd014a6aac5b4c182c06640e"
-temperature = 0.2
-max_tokens = 8000
-timeout = 1000000 
-max_retries = 3
-
-[tracing]
-enabled = true
-traces_dir = "debug/traces"
+# LLM engine configuration.
+provider     = "deepseek"           # e.g. openai | anthropic | deepseek
+model        = "deepseek-chat"
+api_key_env  = "DEEPSEEK_API_KEY"   # export this in your shell
+# api_key    = "sk-..."             # optional inline key (not recommended)
+temperature  = 0.2
+max_tokens   = 8000
+timeout      = 1000000              # ms
+max_retries  = 3
 
 [runtime]
-force = true
-debug = true
-executor_max_workers = 24
-min_delay_sec = 1
-max_retries = 4
-map_batch_override = 32
+# Execution controls.
+force                = false         # re-run even if cached
+debug                = true          # extra debug behavior in some stages
+executor_max_workers = 24            # parallel workers
+min_delay_sec        = 1             # min delay between LLM requests
+max_retries          = 4
+map_batch_override   = 32            # override batch size for "map" step (optional)
+
+[tracing]
+# Enable on-disk traces for auditing & debugging.
+enabled    = true
+traces_dir = "debug/traces"          # traces end up under debug/<run_name>/traces/<run_id>/
+
+[presets.named]
+# Shorthand step lists used by [pipeline].preset
+reformat         = ["chunk","reformat"]
+bullets          = ["chunk","bullets"]
+clean_for_map    = ["chunk","clean_for_map"]
+qa               = ["chunk","qa"]
+mindmap          = ["chunk","tree","cluster","merge","refine"]
+detailed_mindmap = ["chunk","tree","cluster","merge","refine","map"]
+subs_list        = ["subs_list"]
+subs_merge       = ["subs_merge"]
+
+[prompts.files]
+# Optional prompt file overrides (file-based only).
+# If omitted or file missing → falls back to built-in defaults.
+
+# ---- Mindmap flow ----
+# chunk_tree     = "prompts/mindmap/mindmap_generator.txt"
+# merge_tree     = "prompts/mindmap/mindmap_merger.txt"
+# refine_tree    = "prompts/mindmap/mindmap_refiner.txt"
+# map_content    = "prompts/mindmap/content_mapper.txt"
+
+# ---- Q&A flow ----
+# qa_generate    = "prompts/qa/generate_questions.txt"
+# qa_answer      = "prompts/qa/answer_questions.txt"
+
+# ---- Formatting flows ----
+# format_bullets = "prompts/format/format_bullets.txt"
+# reformat_text  = "prompts/format/reformat_text.txt"
+# clean_for_map  = "prompts/format/clean_for_map.txt"

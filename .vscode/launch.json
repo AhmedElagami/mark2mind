@@ -5,7 +5,7 @@
             "type": "debugpy",
             "request": "launch",
             "module": "mark2mind.main",
-            "args": ["--steps", "chunk,qa,tree,cluster,merge,refine,map", "input/test_bullets.md", "test_bullets", "--debug", "--enable-tracing", "--force"]
+            "args": ["--steps", "chunk,qa,tree,cluster,merge,refine,map", "input/merged_subtitles.md", "subtitles", "--debug", "--enable-tracing", "--force"]
         }
     ]
 }
