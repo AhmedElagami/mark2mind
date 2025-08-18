@@ -3,11 +3,11 @@
 ; -------------------------------
 
 [Setup]
-AppId={{A5D7C9B2-6B54-4D3F-9D65-6E0D7B1C3E21}}   ; random GUID, keep as-is or regenerate
+AppId={{A5D7C9B2-6B54-4D3F-9D65-6E0D7B1C3E21}}
 AppName=mark2mind
-AppVersion=0.1.0                                 ; << EDIT THIS >> matches your package version
+AppVersion=0.1.0                                
 AppPublisher=Ahmed Elagami
-DefaultDirName={userappdata}\mark2mind           ; per-user install, no admin required
+DefaultDirName={userappdata}\mark2mind
 DefaultGroupName=mark2mind
 DisableDirPage=no
 DisableProgramGroupPage=yes
