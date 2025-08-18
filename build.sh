@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+sudo apt-get update
+sudo apt-get install -y build-essential patchelf zstd
+pip install nuitka ordered-set zstandard dill
+
+
 rm -rf build
 
 python -m nuitka \
