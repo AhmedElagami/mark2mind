@@ -70,6 +70,7 @@ class StepRunner:
             debug_root=config.debug_root,
             output_root=config.output_root,
             run_name=config.run_name,
+            enable_debug=self.debug
         )
 
         self.retryer = Retryer(max_retries=config.max_retries, min_delay_sec=config.min_delay_sec)

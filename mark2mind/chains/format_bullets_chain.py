@@ -2,6 +2,7 @@ import json
 from typing import Dict, Optional, Union
 from langchain.prompts import PromptTemplate
 from langchain_core.language_models import BaseLanguageModel
+from mark2mind.utils.exporters import unwrap_if_single_fence_md
 from mark2mind.utils.prompt_loader import load_prompt
 from langchain_core.runnables import RunnableLambda
 from markdown_it import MarkdownIt
@@ -26,17 +27,10 @@ class FormatBulletsChain:
             tags=["mark2mind", "outline", "convert", "class:FormatBulletsChain"],
         )
 
-    def _unwrap_top_fence(self, text: str) -> str:
-        md = MarkdownIt("gfm-like")
-        tokens = md.parse(text.strip())
-        if tokens and tokens[0].type == "fence":
-            return tokens[0].content.strip("\n")
-        return text.strip()
-
     def _postprocess(self, obj) -> str:
         raw = self._to_text(obj)
         raw = raw.replace("\r\n", "\n").replace("\r", "\n").lstrip("\ufeff")
-        return self._unwrap_top_fence(raw)
+        return unwrap_if_single_fence_md(raw)
 
     @staticmethod
     def _extract_markdown_payload(chunk: Union[str, Dict]) -> str:

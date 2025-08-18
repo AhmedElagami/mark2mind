@@ -20,7 +20,7 @@ class ArtifactStore:
     - NO user-provided filenames needed (“Option B” auto-naming).
     """
 
-    def __init__(self, debug_root: Path, output_root: Path, run_name: str):
+    def __init__(self, debug_root: Path, output_root: Path, run_name: str, enable_debug: bool):
         self.run_name = run_name
 
         self.debug_root = Path(debug_root).resolve()
@@ -29,7 +29,9 @@ class ArtifactStore:
         self.debug_dir = (self.debug_root / run_name).resolve()
         self.workspace_dir = (self.output_root / run_name).resolve()
 
-        self.debug_dir.mkdir(parents=True, exist_ok=True)
+        # Only create debug dir if enabled
+        if enable_debug:
+            self.debug_dir.mkdir(parents=True, exist_ok=True)
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
 
     # ----- helpers ------------------------------------------------------------

@@ -169,3 +169,23 @@ def export_tree_as_markmap_md(tree: Dict[str, Any], output_path: str) -> None:
     Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"✅ Markmap Markdown saved to: {output_path}")
 
+def normalize_newlines(s: str) -> str:
+    """
+    Normalize newlines and strip BOM if present.
+    - Converts \r\n and \r to \n
+    - Removes leading UTF-8 BOM (\\ufeff)
+    - Strips trailing whitespace
+    """
+    if s is None:
+        return ""
+    return s.replace("\r\n", "\n").replace("\r", "\n").lstrip("\ufeff")
+
+from markdown_it import MarkdownIt
+
+def unwrap_if_single_fence_md(text: str) -> str:
+    s = normalize_newlines(text).strip()
+    md = MarkdownIt("gfm-like")
+    tokens = [t for t in md.parse(s) if t.type != "inline"]
+    if len(tokens) == 1 and tokens[0].type in ("fence", "code_block"):
+        return tokens[0].content.rstrip("\n")
+    return s

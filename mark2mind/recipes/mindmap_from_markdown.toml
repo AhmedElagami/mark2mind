@@ -1,0 +1,22 @@
+[pipeline]
+preset = "mindmap"
+
+[io]
+output_dir = "output"
+debug_dir = "debug"
+
+[chunk]
+tokenizer_name = "gpt2"
+max_tokens     = 1024
+overlap_tokens = 0
+
+[llm]
+# LLM engine configuration.
+provider     = "deepseek"           # e.g. openai | anthropic | deepseek
+model        = "deepseek-chat"
+api_key_env  = "DEEPSEEK_API_KEY"   # export this in your shell
+# api_key    = "sk-..."             # optional inline key (not recommended)
+temperature  = 0.5
+max_tokens   = 8192
+timeout      = 1000000              # ms
+max_retries  = 3

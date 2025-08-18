@@ -5,7 +5,7 @@
             "type": "debugpy",
             "request": "launch",
             "module": "mark2mind.main",
-            "args": ["--steps", "chunk,qa,tree,cluster,merge,refine,map", "input/merged_subtitles.md", "subtitles", "--debug", "--enable-tracing", "--force"]
+            "args": ["--recipe", "reformat_markdown", "--input", "input/merged_subtitles.md", "--debug", "--enable-tracing", "--force"]
         }
     ]
 }

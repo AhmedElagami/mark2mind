@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 from typing import Dict, List, Optional
 from pathlib import Path
 import json
@@ -59,7 +59,7 @@ class LLMConfig(BaseModel):
     api_key_env: str = "DEEPSEEK_API_KEY"
     api_key: Optional[str] = None
     temperature: float = 0.3
-    max_tokens: int = 8000
+    max_tokens: int = 8192
     timeout: Optional[float] = None
     max_retries: int = 2
 
@@ -72,7 +72,7 @@ class TracingConfig(BaseModel):
 class RuntimeConfig(BaseModel):
     force: bool = False
     debug: bool = False
-    executor_max_workers: Optional[int] = 20
+    executor_max_workers: Optional[int] = 24
     min_delay_sec: float = 0.15
     max_retries: int = 4
     map_batch_override: Optional[int] = None
@@ -96,19 +96,19 @@ class PresetsConfig(BaseModel):
     }
 
 
-class PromptsFilesConfig(BaseModel):
+class PromptsFilesConfig(RootModel[Dict[str, str]]):
     """
     Only file-based prompts; keys -> file paths.
     If missing or file not found, we fall back to built-ins.
+
+    Pydantic v2: use RootModel instead of __root__ on BaseModel.
     """
-    __root__: Dict[str, str] = Field(default_factory=dict)
-
     def get_map(self) -> Dict[str, str]:
-        return dict(self.__root__)
-
+        # RootModel stores the value in self.root
+        return dict(self.root or {})
 
 class PromptsConfig(BaseModel):
-    files: PromptsFilesConfig = PromptsFilesConfig()
+    files: PromptsFilesConfig = PromptsFilesConfig(root={})
 
 
 class AppConfig(BaseModel):
@@ -130,7 +130,12 @@ class AppConfig(BaseModel):
 # =============================================================================
 
 def _load_text(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+    try:
+        return path.read_text(encoding="utf-8-sig")  # handles BOM transparently
+    except UnicodeDecodeError as e:
+        raise ValueError(
+            f"Could not read {path} as UTF-8. Please re-save the file as UTF-8 (with or without BOM)."
+        ) from e
 
 
 def _warn(msg: str) -> None:
@@ -212,9 +217,6 @@ def _parse_config_text(text: str, suffix: str) -> dict:
 
 
 def load_config(path_like: Optional[str]) -> AppConfig:
-    """
-    Loads, applies legacy mappings, and normalizes v2-min config.
-    """
     raw: dict = {}
     if path_like:
         p = Path(path_like)
@@ -223,34 +225,9 @@ def load_config(path_like: Optional[str]) -> AppConfig:
         text = _load_text(p)
         raw = _parse_config_text(text, p.suffix.lower())
     else:
-        # empty == defaults
         raw = {}
 
-    # Legacy -> v2-min
     raw = _apply_legacy_mappings(raw)
-
-    # Materialize into AppConfig (so we have defaults)
     app = AppConfig(**(raw or {}))
-
-    # Validate/normalize I/O
-    if not app.io.input:
-        raise ValueError(
-            "Config error: [io].input is required.\n"
-            "Hint: set it to a Markdown file for mindmap/qa, or a directory for subtitles."
-        )
-
-    input_path = Path(app.io.input)
-    if not input_path.exists():
-        raise FileNotFoundError(f"Input path not found: {app.io.input}")
-
-    # Auto-derive run_name if omitted
-    if not app.io.run_name:
-        app.io.run_name = _derive_run_name(input_path)
-        _info(f"[io].run_name not set → using '{app.io.run_name}'.")
-
-    # Ensure basic strings (just in case)
-    app.io.output_dir = app.io.output_dir or "output"
-    app.io.debug_dir = app.io.debug_dir or "debug"
-    app.io.manifest = app.io.manifest or "file_list.txt"
 
     return app

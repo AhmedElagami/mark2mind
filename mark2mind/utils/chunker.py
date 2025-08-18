@@ -17,30 +17,6 @@ with contextlib.redirect_stdout(io.StringIO()) as stdout, contextlib.redirect_st
 from markdown_it import MarkdownIt
 from slugify import slugify
 import uuid
-import spacy
-
-# Load once (globally to avoid reloading per call)
-try:
-    _spacy_nlp = spacy.load("en_core_web_sm")
-except OSError:
-    raise RuntimeError("You must run: python -m spacy download en_core_web_sm")
-
-
-def semantic_split_spacy(text, max_tokens, tokenizer):
-    doc = _spacy_nlp(text)
-    chunks = []
-    current = ""
-    for sent in doc.sents:
-        proposed = current + " " + sent.text if current else sent.text
-        if len(tokenizer.encode(proposed)) > max_tokens:
-            if current:
-                chunks.append(current.strip())
-            current = sent.text
-        else:
-            current = proposed
-    if current:
-        chunks.append(current.strip())
-    return chunks
 
 def _normalize_for_id(s: str) -> str:
     """
@@ -262,13 +238,9 @@ def block_to_markdown(block):
     return ""
 
 def fallback_semantic_split(text, tokenizer, max_tokens):
-    try:
-        import semchunk
-        sem_chunker = semchunk.chunkerify(tokenizer, chunk_size=max_tokens)
-        return sem_chunker(text)
-    except ImportError:
-        print("⚠️ 'semchunk' not installed. Falling back to naive split.")
-        return semantic_split_spacy(text, max_tokens, tokenizer)
+    import semchunk
+    sem_chunker = semchunk.chunkerify(tokenizer, chunk_size=max_tokens)
+    return sem_chunker(text)
 
 def chunk_markdown(md_text: str, max_tokens: int = 2000, tokenizer_name: str = "gpt2", debug=False, debug_dir=Path("debug")) -> List[dict]:
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)

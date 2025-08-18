@@ -3,7 +3,6 @@ from typing import List
 from ..core.context import RunContext
 from ..core.artifacts import ArtifactStore
 from ..core.progress import ProgressReporter
-from mark2mind.utils.clustering import cluster_chunk_trees
 
 class ClusterStage:
     ARTIFACT = "clusters.json"
@@ -20,6 +19,7 @@ class ClusterStage:
         if n <= 1:
             ctx.clustered = [ctx.chunk_results]
         else:
+            from mark2mind.utils.clustering import cluster_chunk_trees
             ctx.clustered = cluster_chunk_trees(ctx.chunk_results, None)
         store.save_debug(self.ARTIFACT, ctx.clustered)
         progress.advance(progress_task); progress.finish(progress_task)

@@ -141,7 +141,7 @@ Outputs:
 
 * A **recipe** = a `config.toml` file pre-configured for a common task.
 * Each recipe lives in a `recipes/` folder inside the package.
-* Examples: `mindmap_from_markdown.toml`, `qa_from_markdown.toml`, `list_subtitles_in_dir.toml`.
+* Examples: `mindmap_from_markdown.toml`, `qa_from_markdown.toml`, `list_notes_in_dir.toml`.
 * Users run them via:
 
   * Direct path:
@@ -197,8 +197,8 @@ api_key_env = "DEEPSEEK_API_KEY"
 The same pattern works for:
 
 * `m2m-qa` → `qa_from_markdown.toml`
-* `m2m-list-subs` → `list_subtitles_in_dir.toml`
-* `m2m-merge-subs` → `merge_subtitles_from_manifest.toml`
+* `m2m-list-subs` → `list_notes_in_dir.toml`
+* `m2m-merge-subs` → `merge_notes_from_manifest.toml`
 * `m2m-reformat` → `reformat_markdown.toml`
 * `m2m-clarify` → `clarify_markdown.toml`
 * `m2m-mindmap-detailed` → `detailed_mindmap_from_markdown.toml`
@@ -215,8 +215,8 @@ mark2mind ships with ready-to-use recipes so you don’t have to write configs b
 
 | Command            | Recipe file                       | Purpose |
 |--------------------|-----------------------------------|---------|
-| `m2m-list-subs`    | `list_subtitles_in_dir.toml`      | List subtitle files and generate manifest |
-| `m2m-merge-subs`   | `merge_subtitles_from_manifest.toml` | Merge subtitles from manifest into one transcript |
+| `m2m-list-subs`    | `list_notes_in_dir.toml`      | List subtitle files and generate manifest |
+| `m2m-merge-subs`   | `merge_notes_from_manifest.toml` | Merge subtitles from manifest into one transcript |
 | `m2m-reformat`     | `reformat_markdown.toml`          | Clean & reformat Markdown file |
 | `m2m-clarify`      | `clarify_markdown.toml`           | Simplify/clarify Markdown text |
 | `m2m-mindmap`      | `mindmap_from_markdown.toml`      | Generate a mindmap |

@@ -1,0 +1,13 @@
+[pipeline]
+preset = "subs_merge"
+
+[io]
+output_dir = "output"
+debug_dir = "debug"
+manifest = "file_list.txt" # written by subs_list, read by subs_merge
+include_html = true        # include .html transcripts
+
+[llm]
+provider = "deepseek"
+model = "deepseek-chat"
+api_key_env = "DEEPSEEK_API_KEY"
