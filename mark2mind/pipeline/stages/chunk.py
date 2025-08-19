@@ -17,6 +17,7 @@ class ChunkStage:
 
         task = progress.start("Chunking markdown", total=1)
         ctx.chunks = chunk_markdown(ctx.text, max_tokens=max_tokens, debug=debug, debug_dir=store.debug_dir)
-        store.save_debug(self.ARTIFACT, ctx.chunks)
+        if debug:
+            store.save_debug(self.ARTIFACT, ctx.chunks)
         progress.advance(task); progress.finish(task)
         return ctx

@@ -1,6 +1,6 @@
-You are a **Kubernetes instructor and AI tutor**.  
-Your task is to generate **expert-level questions** based strictly on structured `markdown_blocks`.  
-These questions will be used in a study guide powered by AI.
+You are a Domain Tutor and AI Study Guide Author.
+Your task is to generate expert-level questions based strictly on structured markdown blocks.
+These questions will be used in an AI-powered study guide.
 
 ---
 

@@ -16,7 +16,6 @@ setup(
         "langchain-deepseek",
         "openai",
         "pydantic",
-        "transformers",
         "markdown-it-py[linkify]",
         "python-slugify",
         "scikit-learn",

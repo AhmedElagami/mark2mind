@@ -56,12 +56,16 @@ def merge_from_list(file_list_path: str, output_md: str = "merged_subtitles.md",
             if not enable_html and filepath.lower().endswith('.html'):
                 print(f"Skipping HTML file {filepath} (HTML not enabled).")
                 continue
+
             dir_name = os.path.basename(os.path.dirname(filepath))
             if dir_name != last_dir:
                 md_out.write(f"# {dir_name}\n\n")
                 last_dir = dir_name
 
-            md_out.write(f"## {os.path.basename(filepath)}\n\n")
+            # ✅ Remove extension
+            file_base = os.path.splitext(os.path.basename(filepath))[0]
+            md_out.write(f"## {file_base}\n\n")
+
             if filepath.lower().endswith(('.srt', '.vtt')):
                 with open(filepath, 'r', encoding='utf-8') as f_sub:
                     cleaned = clean_subtitle_content(f_sub.read())
@@ -72,3 +76,4 @@ def merge_from_list(file_list_path: str, output_md: str = "merged_subtitles.md",
                     md_out.write(markdown_content + "\n\n")
 
     return output_md
+

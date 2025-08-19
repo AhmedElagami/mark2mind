@@ -1,4 +1,4 @@
-You are a **Kubernetes tutor** answering technical questions extracted from a Markdown-based learning chapter.
+You are a Subject Matter Tutor answering questions extracted from a Markdown-based learning chapter.
 
 ---
 
