@@ -1,390 +1,201 @@
 # mark2mind
 
-> Transform raw text or subtitles into **mindmaps**, **Q&A notes**, or **clean formatted markdown** using LLM pipelines.  
-> Designed for both beginners (one-command presets) and advanced users (fine-grained pipeline control).
+**Semantic mindmap & Q\&A generator for Markdown and subtitles.**
+Built with [LangChain](https://www.langchain.com/) + LLMs.
+
+Generate:
+
+* 📌 **Mindmaps** (basic or detailed)
+* ❓ **Q\&A study guides**
+* 📑 **Structured outlines & bullets**
+* 🧹 **Reformatted or cleaned Markdown for mapping**
+* 🎬 **Subtitle collection & merging**
 
 ---
 
-## 🚀 Overview
+## 🚀 Installation
 
-**mark2mind** is a command-line tool that helps you:
-
-- Generate **mindmaps** from Markdown or subtitles.
-- Create **Q&A summaries** of text documents.
-- Merge and clean **subtitle collections**.
-- Reformat or bullet text for clarity.
-
-It runs as a pipeline of stages (chunking, tree building, clustering, merging, refining, mapping, etc.), powered by an LLM backend (DeepSeek or similar).
-
-Outputs are automatically organized under:
-
+```bash
+# Clone and install in editable mode
+git clone https://github.com/your-repo/mark2mind.git
+cd mark2mind
+pip install -e .
 ```
-
-output/<run_name>/
-
-```
-
-Debugging and tracing data are stored under:
-
-```
-
-debug/<run_name>/
-
-````
-
----
-
-## 📦 Installation
 
 Requirements:
 
-- Python **3.10+** (tested on 3.11/3.12).
-- [Poetry](https://python-poetry.org/) or `pip` for dependency management.
-- A supported LLM API key (e.g. `DEEPSEEK_API_KEY`).
+* Python ≥ 3.8
+* API key for your chosen LLM provider (default: DeepSeek).
 
-Clone and install:
+  ```bash
+  export DEEPSEEK_API_KEY="sk-..."
+  ```
 
-```bash
-git clone https://github.com/yourname/mark2mind.git
-cd mark2mind
+---
 
-# install dependencies
-pip install -e .
-````
-
-Check installation:
+## 🏃 Quick Start
 
 ```bash
-python -m mark2mind --help
+# Generate a detailed mindmap from a Markdown file
+mark2mind --recipe detailed_mindmap_from_markdown --input notes/intro.md
+```
+
+Outputs will be created under:
+
+```
+output/<run_name>/
+  ├─ mindmap.json          # JSON structure
+  ├─ mindmap.markmap.md    # Interactive Markmap-compatible Markdown
+  ├─ qa.md                 # (if QA run) nested questions & answers
+  ├─ bullets.md            # (if outline run) bullet-point summary
+```
+
+Debug artifacts live under:
+
+```
+debug/<run_name>/...
 ```
 
 ---
 
-## 🏁 Quick Start (Beginner)
+## 📦 Using Recipes
 
-### 1. Minimal Config
-
-Save as `config.toml`:
-
-```toml
-[io]
-input = "examples/sample.md"   # file or directory
-output_dir = "output"
-debug_dir = "debug"
-
-[pipeline]
-preset = "mindmap"             # or qa | detailed_mindmap | subs_list | subs_merge
-
-[llm]
-provider = "deepseek"
-model = "deepseek-chat"
-api_key_env = "DEEPSEEK_API_KEY"
-```
-
-### 2. Run Presets
-
-Each preset defines a ready-to-use pipeline:
-
-#### Mindmap
+Recipes are **prebuilt TOML configs** that define complete workflows.
+List them with:
 
 ```bash
-python -m mark2mind --config config.toml --preset mindmap
+mark2mind --list-recipes
 ```
 
-Outputs:
+### Built-in Recipes
 
-* `output/<run_name>/mindmap.json`
-* `output/<run_name>/mindmap.markmap.md`
+| Recipe                           | Preset             | What it Does                                                               |
+| -------------------------------- | ------------------ | -------------------------------------------------------------------------- |
+| `mindmap_from_markdown`          | `mindmap`          | Chunk → Tree → Cluster → Merge → Refine → Mindmap                          |
+| `detailed_mindmap_from_markdown` | `detailed_mindmap` | Same as above + `map` stage (attaches content/code/tables/images to nodes) |
+| `qa_from_markdown`               | `qa`               | Chunk text, then generate Q\&A per block                                   |
+| `outline_markdown`               | `bullets`          | Bullet-point outline of Markdown                                           |
+| `reformat_markdown`              | `reformat`         | Rewrites Markdown into cleaner prose                                       |
+| `focus_markdown`                 | `clean_for_map`    | Simplifies Markdown for easier mapping                                     |
+| `list_notes_in_dir`              | `subs_list`        | Collect subtitles (.srt, .vtt, .html) into a manifest                      |
+| `merge_notes_from_manifest`      | `subs_merge`       | Merge subtitle manifest into a Markdown transcript                         |
 
-#### Detailed Mindmap
-
-```bash
-python -m mark2mind --config config.toml --preset detailed_mindmap
-```
-
-Outputs: same as above, but with **extra content mapping**.
-
-#### Q\&A
-
-```bash
-python -m mark2mind --config config.toml --preset qa
-```
-
-Outputs:
-
-* `output/<run_name>/qa.md`
-
-#### Subtitles (list files)
-
-```bash
-python -m mark2mind --config config.toml --preset subs_list
-```
-
-Outputs:
-
-* `output/<run_name>/file_list.txt` (or custom manifest)
-
-#### Subtitles (merge)
-
-```bash
-python -m mark2mind --config config.toml --preset subs_merge
-```
-
-Requires an existing manifest (from `subs_list`).
-Outputs:
-
-* `output/<run_name>/subtitles_merged.md`
+Aliases also exist, e.g. `list_subtitles_in_dir → list_notes_in_dir`.
 
 ---
 
-## 🧾 What Recipes Are
+## ⚙️ Pipeline Stages
 
-* A **recipe** = a `config.toml` file pre-configured for a common task.
-* Each recipe lives in a `recipes/` folder inside the package.
-* Examples: `mindmap_from_markdown.toml`, `qa_from_markdown.toml`, `list_notes_in_dir.toml`.
-* Users run them via:
+Workflows are defined by **steps**. A `preset` is just a shortcut for a step list.
+You can override stages manually with `--steps`.
 
-  * Direct path:
+### Available Stages
 
-    ```bash
-    mark2mind --config recipes/mindmap_from_markdown.toml --input notes.md
-    ```
-  * Shortcut CLI (if you expose entrypoints):
+| Stage           | Purpose                                                            |
+| --------------- | ------------------------------------------------------------------ |
+| `chunk`         | Split Markdown into semantic chunks                                |
+| `tree`          | Generate hierarchical tree per chunk                               |
+| `cluster`       | Cluster chunk trees (semantic grouping)                            |
+| `merge`         | Merge clustered trees                                              |
+| `refine`        | Refine & assign stable IDs to tree                                 |
+| `map`           | Map original content (code, tables, images, paragraphs) into nodes |
+| `qa`            | Generate questions & answers per block                             |
+| `bullets`       | Turn chunks into bullet lists                                      |
+| `reformat`      | Reformat raw Markdown                                              |
+| `clean_for_map` | Simplify Markdown for mapping                                      |
+| `subs_list`     | Scan a directory for subtitle files                                |
+| `subs_merge`    | Merge subtitles into one Markdown file                             |
 
-    ```bash
-    m2m-mindmap --input notes.md
-    ```
-  * Or generic runner:
-
-    ```bash
-    m2m --recipe mindmap_from_markdown --input notes.md
-    ```
-
----
-
-## 📂 Where Recipes Live
-
-* **Inside the repo** (`mark2mind/recipes/*.toml`) → installed automatically with the package.
-* You can also allow **external recipe dirs** (e.g. `--recipe-dir ./my_recipes`) so users can create custom flows.
-
----
-
-## ✅ Beginner-Friendly Workflow With Recipes
-
-Instead of learning all `[pipeline]` steps, a user can just run:
+### Example: Run a custom step sequence
 
 ```bash
-m2m-mindmap --input intro.md
+mark2mind --config config.toml --steps chunk,qa
 ```
 
-and behind the scenes it loads `recipes/mindmap_from_markdown.toml`:
+This chunks text and generates Q\&A only.
+
+---
+
+## 📁 Config File (`config.toml`)
+
+The config lets you fine-tune everything. Example:
 
 ```toml
 [pipeline]
-preset = "mindmap"
+preset = "detailed_mindmap"   # or steps=["chunk","tree","cluster","merge","refine","map"]
 
 [io]
-input = "CHANGE_ME_TO_FILE.md"
+input = "notes/intro.md"      # file or directory
 output_dir = "output"
 debug_dir  = "debug"
 
+[chunk]
+tokenizer_name = "gpt2"
+max_tokens = 1024
+overlap_tokens = 0
+
 [llm]
 provider = "deepseek"
 model = "deepseek-chat"
 api_key_env = "DEEPSEEK_API_KEY"
-```
+temperature = 0.2
+max_tokens = 8000
 
-The same pattern works for:
-
-* `m2m-qa` → `qa_from_markdown.toml`
-* `m2m-list-subs` → `list_notes_in_dir.toml`
-* `m2m-merge-subs` → `merge_notes_from_manifest.toml`
-* `m2m-reformat` → `reformat_markdown.toml`
-* `m2m-clarify` → `clarify_markdown.toml`
-* `m2m-mindmap-detailed` → `detailed_mindmap_from_markdown.toml`
-
----
-
-## 🔧 In the README (suggested section)
-
-Add a **Recipes** section:
-
-### 🍳 Recipes (Predefined Workflows)
-
-mark2mind ships with ready-to-use recipes so you don’t have to write configs by hand.
-
-| Command            | Recipe file                       | Purpose |
-|--------------------|-----------------------------------|---------|
-| `m2m-list-subs`    | `list_notes_in_dir.toml`      | List subtitle files and generate manifest |
-| `m2m-merge-subs`   | `merge_notes_from_manifest.toml` | Merge subtitles from manifest into one transcript |
-| `m2m-reformat`     | `reformat_markdown.toml`          | Clean & reformat Markdown file |
-| `m2m-clarify`      | `clarify_markdown.toml`           | Simplify/clarify Markdown text |
-| `m2m-mindmap`      | `mindmap_from_markdown.toml`      | Generate a mindmap |
-| `m2m-mindmap-detailed` | `detailed_mindmap_from_markdown.toml` | Mindmap + mapped content |
-| `m2m-qa`           | `qa_from_markdown.toml`           | Q&A summary from Markdown |
-
-#### Example
-
-```bash
-## Generate a mindmap
-m2m-mindmap --input notes/intro.md
-
-## Create Q&A notes
-m2m-qa --input notes/chapter1.md
-
-## List subtitles
-m2m-list-subs --input data/subtitles/
-
-## Merge subtitles (after list)
-m2m-merge-subs --input data/subtitles/
-````
-
-Each recipe is just a TOML config. You can copy them and customize your own.
-
-## 🔧 Advanced Usage
-
-### How Pipelines Work
-
-A pipeline is a sequence of **stages**. Presets are shortcuts for common flows.
-
-You can override steps manually:
-
-```bash
-python -m mark2mind --config config.toml --steps chunk,tree,cluster,merge,refine,map
-```
-
----
-
-## 🔍 Stages Explained
-
-| Stage               | Purpose                                          |
-| ------------------- | ------------------------------------------------ |
-| **chunk**           | Splits input into manageable pieces (by tokens). |
-| **tree**            | Builds initial hierarchical tree of ideas.       |
-| **cluster**         | Groups related nodes together.                   |
-| **merge**           | Merges clusters into a unified structure.        |
-| **refine**          | Refines tree with improved coherence.            |
-| **map**             | Maps final tree into a detailed content mindmap. |
-| **bullets**         | Converts chunks into bulleted text.              |
-| **reformat**        | Rewrites chunks for readability.                 |
-| **clean\_for\_map** | Cleans text specifically for mapping.            |
-| **subs\_list**      | Lists subtitles and creates manifest.            |
-| **subs\_merge**     | Merges subtitles into a Markdown transcript.     |
-
----
-
-## ⚙️ Configuration
-
-### Chunking
-
-```toml
-[chunk]
-tokenizer_name = "gpt2"
-max_tokens = 2000
-overlap_tokens = 200
-```
-
-* **max\_tokens**: size of each chunk.
-* **overlap\_tokens**: overlap for context preservation.
-
-### Prompt Overrides
-
-Use `[prompts.files]` to point to your own prompt text files:
-
-```toml
-[prompts.files]
-chunk_tree = "custom_prompts/my_tree.txt"
-qa_generate = "custom_prompts/my_questions.txt"
-```
-
-If a file is missing → falls back to built-in defaults.
-
-### Tracing & Debugging
-
-Enable tracing:
-
-```bash
-python -m mark2mind --config config.toml --enable-tracing
-```
-
-Outputs traces under:
-
-```
-debug/<run_name>/traces/
-```
-
-Useful for inspecting step-by-step interactions with the LLM.
-
-### Runtime Tuning
-
-```toml
 [runtime]
-force = true                 # re-run, ignore cache
-executor_max_workers = 8     # control parallelism
-min_delay_sec = 0.2          # delay between API calls
-max_retries = 5
-map_batch_override = 5       # override batch size for map stage
+debug = true
+force = false
+executor_max_workers = 24
+min_delay_sec = 1
 ```
 
-### Subtitles Flow
+---
 
-```toml
-[io]
-input = "data/subtitles"   # directory of .srt/.vtt files
-manifest = "file_list.txt" # written by subs_list, read by subs_merge
-include_html = true        # include .html transcripts
+## 👩‍💻 Developer Notes
+
+* **Entry point**: `mark2mind.main:main` (CLI)
+* **Pipeline runner**: `mark2mind.pipeline.runner.StepRunner` orchestrates stages.
+* **Recipes** live in `mark2mind/recipes/*.toml`, copied to `~/.mark2mind/recipes/` at first run.
+* **Prompts** are in `mark2mind/prompts/**`, override via `config.toml → [prompts.files]`.
+* **Artifacts** are managed by `ArtifactStore`. Debug files (JSON) are saved automatically.
+* **Tracing**: enable with `--enable-tracing` to get per-step LangChain trace logs in `debug/<run>/traces/`.
+* **Extending**: Add new stages under `mark2mind/pipeline/stages/` and wire them in `StepRunner`.
+
+---
+
+## 🔍 Examples
+
+### Generate Q\&A guide from Markdown
+
+```bash
+mark2mind --recipe qa_from_markdown --input notes/kubernetes.md
 ```
 
-Pipeline:
-
-1. `subs_list` → creates manifest of all subtitle files.
-2. `subs_merge` → consumes manifest, outputs merged transcript.
+→ Output: `output/kubernetes/qa.md`
 
 ---
 
-## 🛠️ Debugging
+### Convert a folder of subtitles into Markdown
 
-* **Outputs** → always in `output/<run_name>/...`
-* **Debug files** → in `debug/<run_name>/...`
-* **Tracing** → enable with `--enable-tracing`.
+```bash
+# Step 1: collect all subtitles into a manifest
+mark2mind --recipe list_notes_in_dir --input data/subtitles_course
 
-Artifacts include intermediate chunks, QA pairs, and tree structures.
+# Step 2: merge them into a Markdown transcript
+mark2mind --recipe merge_notes_from_manifest --input data/subtitles_course
+```
 
----
-
-## ❓ FAQ / Troubleshooting
-
-**Q: I get `Config error: [io].input is required`.**
-A: Add `[io].input = "yourfile.md"` to `config.toml`.
+→ Output: `output/subtitles_course/subtitles_merged.md`
 
 ---
 
-**Q: Wrong mode: tried `subs_list` with a file input.**
-A: Subtitles pipelines require `[io].input` to be a **directory**.
+### Custom workflow with config file
+
+```bash
+mark2mind --config custom_config.toml
+```
 
 ---
 
-**Q: `subs_merge` fails: manifest not found.**
-A: Run `subs_list` first, or set `[io].manifest` to point to an existing file.
+## 📜 License
 
----
-
-**Q: API key error.**
-A: Ensure you’ve set `DEEPSEEK_API_KEY` in your environment or in `[llm].api_key`.
-
----
-
-**Q: My outputs are empty.**
-A: Check `debug/<run_name>/...` for intermediate artifacts; re-run with `--force`.
-
----
-
-## ✅ Summary
-
-* Use **recipes** or **presets** for quick runs.
-* Use **steps** for custom pipelines.
-* All outputs live in `output/<run_name>/`.
-* Debug/traces in `debug/<run_name>/`.
-* Override prompts if you need custom behavior.
-
-mark2mind makes it easy to go from **raw text** → **structured knowledge**.
+MIT (c) Ahmed Elagami
