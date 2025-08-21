@@ -12,16 +12,13 @@ from mark2mind.chains.merge_tree_chain import TreeMergeChain
 class MergeStage:
     ARTIFACT = "merged_clusters.json"
 
-    def __init__(self, llm_pool: LLMFactoryPool, retryer: Retryer, callbacks=None, chain_instance: TreeMergeChain | None = None):
+    def __init__(self, llm_pool: LLMFactoryPool, retryer: Retryer, callbacks=None):
         self.llm_pool = llm_pool
         self.retryer = retryer
         self.callbacks = callbacks
-        self.chain_instance = chain_instance
 
     def _make_chain(self):
         llm = self.llm_pool.get()
-        if llm is None:
-            return self.chain_instance
         return TreeMergeChain(llm, callbacks=self.callbacks)
 
     def _merge_round(self, trees: List[Dict], chain: TreeMergeChain, tag_prefix: str) -> List[Dict]:

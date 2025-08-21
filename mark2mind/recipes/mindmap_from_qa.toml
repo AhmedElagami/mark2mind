@@ -1,0 +1,23 @@
+# FILE: mark2mind/mark2mind/recipes/mindmap_from_qa.toml
+# Create a mindmap from a QA markdown file, and attach Q&A to node.content_refs
+[pipeline]
+# Build the tree as usual, then parse QAs and map them
+steps = ["chunk","tree","cluster","merge","refine","qa_parse","map"]
+
+[io]
+output_dir = "output"
+debug_dir  = "debug"
+
+[chunk]
+tokenizer_name = "gpt2"
+max_tokens     = 1024
+overlap_tokens = 0
+
+[llm]
+provider     = "deepseek"
+model        = "deepseek-chat"
+api_key_env  = "DEEPSEEK_API_KEY"
+temperature  = 0.3
+max_tokens   = 8192
+timeout      = 1000000
+max_retries  = 3

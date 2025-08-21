@@ -6,7 +6,6 @@ import re
 import os
 from pathlib import Path
 from typing import List
-#Silence tokenizer warning on import
 with contextlib.redirect_stdout(io.StringIO()) as stdout, contextlib.redirect_stderr(
     io.StringIO()
 ) as stderr:

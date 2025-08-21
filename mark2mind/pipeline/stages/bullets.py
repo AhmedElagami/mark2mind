@@ -15,17 +15,13 @@ class BulletsStage:
     def __init__(self,
                  llm_pool: LLMFactoryPool,
                  retryer: Retryer,
-                 callbacks=None,
-                 chain_instance: FormatBulletsChain | None = None):
+                 callbacks=None):
         self.llm_pool = llm_pool
         self.retryer = retryer
         self.callbacks = callbacks
-        self.chain_instance = chain_instance
 
     def _make_chain(self):
         llm = self.llm_pool.get()
-        if llm is None:
-            return self.chain_instance
         return FormatBulletsChain(llm, callbacks=self.callbacks)
 
     def run(self,

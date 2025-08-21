@@ -9,6 +9,7 @@ BUILTIN_PROMPTS = {
     "merge_tree":   "prompts/mindmap/mindmap_merger.txt",
     "refine_tree":  "prompts/mindmap/mindmap_refiner.txt",
     "map_content":  "prompts/mindmap/content_mapper.txt",
+    "map_content_qa":"prompts/mindmap/content_mapper_qa.txt",  # NEW
     "qa_generate":  "prompts/qa/generate_questions.txt",
     "qa_answer":    "prompts/qa/answer_questions.txt",
     "format_bullets":"prompts/format/format_bullets.txt",

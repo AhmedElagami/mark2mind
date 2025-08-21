@@ -14,17 +14,12 @@ from mark2mind.utils.tree_helper import assign_node_ids
 class RefineStage:
     ARTIFACT = "refined_tree.json"
 
-    def __init__(self, llm_pool: LLMFactoryPool, retryer: Retryer, callbacks=None, merge_chain_instance: TreeMergeChain | None = None, refine_chain_instance: TreeRefineChain | None = None):
+    def __init__(self, llm_pool: LLMFactoryPool, retryer: Retryer, callbacks=None):
         self.llm_pool = llm_pool
         self.retryer = retryer
         self.callbacks = callbacks
-        self.merge_chain_instance = merge_chain_instance
-        self.refine_chain_instance = refine_chain_instance
-
     def _make_chains(self):
         llm = self.llm_pool.get()
-        if llm is None:
-            return self.merge_chain_instance, self.refine_chain_instance
         return TreeMergeChain(llm, callbacks=self.callbacks), TreeRefineChain(llm, callbacks=self.callbacks)
 
     def _merge_all_parallel(self, trees: List[Dict], merge_chain: TreeMergeChain, executor: ExecutorProvider):

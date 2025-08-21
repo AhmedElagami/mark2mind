@@ -93,7 +93,9 @@ class PresetsConfig(BaseModel):
         "detailed_mindmap": ["chunk", "tree", "cluster", "merge", "refine", "map"],
         "subs_list": ["subs_list"],
         "subs_merge": ["subs_merge"],
+        "mindmap_from_qa": ["chunk", "tree", "cluster", "merge", "refine", "qa_parse", "map"],
     }
+
 
 
 class PromptsFilesConfig(RootModel[Dict[str, str]]):
