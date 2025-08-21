@@ -3,6 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from rich.console import Console
+from datetime import datetime
+import uuid
+
+from mark2mind import __version__
+from mark2mind.utils.tree_helper import add_order_and_fingerprint
 
 from mark2mind.pipeline.stages.clean_for_map import CleanForMapStage
 from mark2mind.pipeline.stages.reformat import ReformatTextStage
@@ -205,6 +210,30 @@ class StepRunner:
                                          force=self.cfg.force, map_batch_override=self.cfg.map_batch_override)
 
                 if ctx.final_tree:
+                    # aggregate tags from chunk results
+                    tag_set = {t for r in ctx.chunk_results for t in r.get("tags", [])}
+
+                    # annotate nodes with order + fingerprint
+                    add_order_and_fingerprint(ctx.final_tree)
+
+                    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+                    ctx.final_tree.update({
+                        "schema_version": "1.0.0",
+                        "map_id": str(uuid.uuid4()),
+                        "meta": {
+                            "created_at": now,
+                            "updated_at": now,
+                            "revision": 1,
+                            "source": str(self.cfg.input_path),
+                            "generator": {
+                                "name": "mark2mind",
+                                "version": __version__,
+                                "run_id": self.cfg.run_id,
+                            },
+                        },
+                        "tags": sorted(tag_set),
+                    })
+
                     out_json = self.store.resolve_workspace_path("mindmap.json")
 
                     def _strip_content_refs(node: Dict[str, Any]) -> Dict[str, Any]:

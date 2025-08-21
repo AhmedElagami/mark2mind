@@ -1,4 +1,5 @@
 import hashlib
+from datetime import datetime
 from slugify import slugify
 from rich.tree import Tree as RichTree
 from typing import Dict, List, Optional, Tuple
@@ -25,6 +26,11 @@ def insert_content_refs_into_tree(tree: Dict, mapped_content: List[Dict]) -> Non
     Insert content refs into nodes. Supports:
       - paragraph/code/table/image: stored as markdown + element_caption
       - qa: stored as {type:'qa', q:'...', a:'...'}
+
+    Each ref also includes:
+      - ``markdown``: content (for QA this is ``## Q\nA``)
+      - ``hash``: ``sha256:<hex>`` of ``markdown``
+      - ``created_at``: ISO-8601 UTC timestamp
     """
 
     def find_node(node: Dict, node_id: str) -> Optional[Dict]:
@@ -42,24 +48,53 @@ def insert_content_refs_into_tree(tree: Dict, mapped_content: List[Dict]) -> Non
             continue
 
         rtype = (item.get("type") or "").lower()
+        created_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
         if rtype == "qa":
+            q = item.get("q") or ""
+            a = item.get("a") or ""
+            markdown = f"## {q}\n{a}"
+            h = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
             target.setdefault("content_refs", []).append(
                 {
                     "element_id": item.get("element_id"),
                     "type": "qa",
-                    "q": item.get("q") or "",
-                    "a": item.get("a") or "",
+                    "q": q,
+                    "a": a,
+                    "markdown": markdown,
+                    "hash": f"sha256:{h}",
+                    "created_at": created_at,
                 }
             )
         else:
+            markdown = item.get("markdown", "") or ""
+            h = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
             target.setdefault("content_refs", []).append(
                 {
                     "element_id": item.get("element_id"),
                     "type": rtype,
                     "element_caption": item.get("element_caption"),
-                    "markdown": item.get("markdown", "") or "",
+                    "markdown": markdown,
+                    "hash": f"sha256:{h}",
+                    "created_at": created_at,
                 }
             )
+
+def add_order_and_fingerprint(node: Dict, path_titles: Optional[List[str]] = None, order: int = 0) -> None:
+    """Recursively add ``order`` and ``origin.fingerprint`` to each node."""
+    path_titles = path_titles or []
+    node["order"] = order
+
+    # primary content hash from first content_ref markdown (if any)
+    content_refs = node.get("content_refs") or []
+    primary_md = content_refs[0].get("markdown", "") if content_refs else ""
+    primary_hash = hashlib.sha1(primary_md.encode("utf-8")).hexdigest()
+    path_joined = " / ".join(path_titles)
+    base = f"{(node.get('title') or '').lower()}|{path_joined}|{primary_hash}"
+    fingerprint = hashlib.sha1(base.encode("utf-8")).hexdigest()[:8]
+    node["origin"] = {"fingerprint": fingerprint}
+
+    for idx, child in enumerate(node.get("children", []) or []):
+        add_order_and_fingerprint(child, path_titles + [node.get("title", "")], idx)
 
 def render_tree(node: Dict, rich_tree: Optional[RichTree] = None):
     label = f"[bold]{node['title']}[/]"
