@@ -159,55 +159,121 @@ class StepRunner:
             ctx = RunContext(text=text)
 
             if "chunk" in self.cfg.steps:
-                ctx = self.chunk_stage.run(ctx, app.chunk.max_tokens, self.store, progress,
-                                           debug=self.debug, force=self.cfg.force)
-            else:
+                ctx = self.chunk_stage.run(
+                    ctx,
+                    app.chunk.max_tokens,
+                    self.store,
+                    progress,
+                    debug=self.debug,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
+            elif self.cfg.use_debug_io:
                 loaded = self.store.load_debug("chunks.json")
                 if loaded is not None:
                     ctx.chunks = loaded
 
             if "reformat" in self.cfg.steps:
-                ctx = self.reformat_text_stage.run(ctx, self.store, progress, executor=self.executor, force=self.cfg.force)
+                ctx = self.reformat_text_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    executor=self.executor,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
                 self.md_exporter.export_bullets(getattr(ctx, "reformat_outputs", []),
                     self.store.resolve_workspace_path("reformatted.md"))
                 self.console.log(f"✅ reformatted markdown saved to: {self.store.resolve_workspace_path('reformatted.md')}")
 
             if "clean_for_map" in self.cfg.steps:
-                ctx = self.clean_for_map_stage.run(ctx, self.store, progress, executor=self.executor, force=self.cfg.force)
+                ctx = self.clean_for_map_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    executor=self.executor,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
                 self.md_exporter.export_bullets(getattr(ctx, "clean_for_map_outputs", []),
                     self.store.resolve_workspace_path("clean_for_map.md"))
                 self.console.log(f"✅ reformatted markdown saved to: {self.store.resolve_workspace_path('clean_for_map.md')}")
 
             if "bullets" in self.cfg.steps:
-                ctx = self.bullets_stage.run(ctx, self.store, progress, executor=self.executor, force=self.cfg.force)
+                ctx = self.bullets_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    executor=self.executor,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
                 self.md_exporter.export_bullets(getattr(ctx, "bullets_outputs", []),
                     self.store.resolve_workspace_path("bullets.md"))
                 self.console.log(f"✅ Bulleted markdown saved to: {self.store.resolve_workspace_path('bullets.md')}")
 
             if "qa" in self.cfg.steps:
-                ctx = self.qa_stage.run(ctx, self.store, progress, executor=self.executor, force=self.cfg.force)
-                self.md_exporter.export_qa(ctx.chunks, self.store.resolve_workspace_path("qa.md"))
-            else:
+                ctx = self.qa_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    executor=self.executor,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
+                self.md_exporter.export_qa(
+                    ctx.chunks, self.store.resolve_workspace_path("qa.md")
+                )
+            elif self.cfg.use_debug_io:
                 loaded = self.store.load_debug("chunks_with_qa.json")
                 if loaded is not None:
                     ctx.chunks = loaded
 
             if "tree" in self.cfg.steps:
-                ctx = self.tree_stage.run(ctx, self.store, progress, executor=self.executor, force=self.cfg.force)
+                ctx = self.tree_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    executor=self.executor,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
             if "cluster" in self.cfg.steps:
-                ctx = self.cluster_stage.run(ctx, self.store, progress, force=self.cfg.force)
+                ctx = self.cluster_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
             if "merge" in self.cfg.steps:
-                ctx = self.merge_stage.run(ctx, self.store, progress, executor=self.executor, force=self.cfg.force)
+                ctx = self.merge_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    executor=self.executor,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
             if "refine" in self.cfg.steps:
-                ctx = self.refine_stage.run(ctx, self.store, progress, executor=self.executor, force=self.cfg.force)
+                ctx = self.refine_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    executor=self.executor,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
 
             # NEW: parse QA markdown before mapping (if requested)
             if "qa_parse" in self.cfg.steps:
-                ctx = self.qa_from_md_stage.run(ctx, self.store, progress, force=self.cfg.force)
+                ctx = self.qa_from_md_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
 
             if "map" in self.cfg.steps:
-                ctx = self.map_stage.run(ctx, self.store, progress, executor=self.executor,
-                                         force=self.cfg.force, map_batch_override=self.cfg.map_batch_override)
+                ctx = self.map_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    executor=self.executor,
+                    use_debug_io=self.cfg.use_debug_io,
+                    map_batch_override=self.cfg.map_batch_override,
+                )
 
                 if ctx.final_tree:
                     # aggregate tags from chunk results

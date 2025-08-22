@@ -8,8 +8,17 @@ from mark2mind.utils.chunker import chunk_markdown
 class ChunkStage:
     ARTIFACT = "chunks.json"
 
-    def run(self, ctx: RunContext, max_tokens: int, store: ArtifactStore, progress: ProgressReporter, *, debug: bool, force: bool) -> RunContext:
-        if not force:
+    def run(
+        self,
+        ctx: RunContext,
+        max_tokens: int,
+        store: ArtifactStore,
+        progress: ProgressReporter,
+        *,
+        debug: bool,
+        use_debug_io: bool,
+    ) -> RunContext:
+        if use_debug_io:
             loaded = store.load_debug(self.ARTIFACT)
             if loaded is not None:
                 ctx.chunks = loaded

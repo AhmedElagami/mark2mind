@@ -27,7 +27,7 @@ class RunConfig:
 
     steps: List[str] = field(default_factory=lambda: ["chunk", "tree", "cluster", "merge", "refine", "map"])
     run_id: str = "manual"
-    force: bool = False
+    use_debug_io: bool = False
     app: Optional[AppConfig] = None
 
     # execution knobs
@@ -59,7 +59,7 @@ class RunConfig:
             debug_root=Path(app.io.debug_dir),
             output_root=Path(app.io.output_dir),
             steps=steps,
-            force=app.runtime.force,
+            use_debug_io=app.runtime.use_debug_io,
             min_delay_sec=app.runtime.min_delay_sec,
             max_retries=app.runtime.max_retries,
             executor_max_workers=app.runtime.executor_max_workers,

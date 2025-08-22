@@ -59,7 +59,7 @@ class MapContentStage:
         progress: ProgressReporter,
         *,
         executor: ExecutorProvider,
-        force: bool,
+        use_debug_io: bool,
         map_batch_override: int | None,
     ) -> RunContext:
         if not ctx.final_tree:

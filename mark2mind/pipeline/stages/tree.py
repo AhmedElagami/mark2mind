@@ -29,12 +29,20 @@ class TreeStage:
             c[path] += int(b.get("token_count", 0)) or 1
         return [p for p,_ in c.most_common(3)]
 
-    def run(self, ctx: RunContext, store: ArtifactStore, progress: ProgressReporter, *, executor: ExecutorProvider, force: bool) -> RunContext:
-        if not force:
+    def run(
+        self,
+        ctx: RunContext,
+        store: ArtifactStore,
+        progress: ProgressReporter,
+        *,
+        executor: ExecutorProvider,
+        use_debug_io: bool,
+    ) -> RunContext:
+        if use_debug_io:
             loaded = store.load_debug(self.ARTIFACT)
             if loaded is not None:
                 ctx.chunk_results = loaded
-            return ctx
+                return ctx
 
         items = list(enumerate(ctx.chunks))
         task = progress.start("Trees per chunk", total=len(items))

@@ -62,7 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Runtime/debug
     p.add_argument("--debug", action="store_true", help="Enable verbose debug")
-    p.add_argument("--force", action="store_true", help="Force re-run (ignore cached artifacts)")
+    p.add_argument(
+        "--use-debug-io",
+        action="store_true",
+        help="Use cached artifacts from debug/<run_name> if present",
+    )
     p.add_argument(
         "--enable-tracing",
         action="store_true",
@@ -157,8 +161,8 @@ def main():
     # Prepare RunConfig
     cfg = RunConfig.from_app(app)
     cfg.run_id = run_id
-    if args.force:
-        cfg.force = True
+    if args.use_debug_io:
+        cfg.use_debug_io = True
     if args.max_workers is not None:
         cfg.executor_max_workers = args.max_workers
 

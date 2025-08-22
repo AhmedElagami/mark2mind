@@ -29,8 +29,11 @@ class ArtifactStore:
         self.debug_dir = (self.debug_root / run_name).resolve()
         self.workspace_dir = (self.output_root / run_name).resolve()
 
+        # Remember whether we should write debug artifacts at all
+        self.enable_debug = enable_debug
+
         # Only create debug dir if enabled
-        if enable_debug:
+        if self.enable_debug:
             self.debug_dir.mkdir(parents=True, exist_ok=True)
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
 
@@ -46,6 +49,8 @@ class ArtifactStore:
 
     # ----- debug artifacts ----------------------------------------------------
     def save_debug(self, name: str, obj: Any):
+        if not self.enable_debug:
+            return
         p = self.debug_dir / name
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(self._wrap(obj, "debug"), indent=2, ensure_ascii=False), encoding="utf-8")
