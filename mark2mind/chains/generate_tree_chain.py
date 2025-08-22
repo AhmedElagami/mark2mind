@@ -6,13 +6,16 @@ from langchain_core.language_models import BaseLanguageModel
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
 from mark2mind.utils.prompt_loader import load_prompt
-from mark2mind.utils.tree_helper import normalize_tree
+from mark2mind.utils.tree_helper import normalize_tree, fallback_tags_from_tree
 
 from langchain_core.runnables import RunnableLambda
 
 class TreeOutputSchema(BaseModel):
     tree: Dict[str, Any] = Field(..., description="Hierarchical mindmap structure")
-    tags: List[str] = Field(..., description="Flat list of semantic keywords")
+    tags: List[str] = Field(default_factory=list, description="Flat list of semantic keywords")
+
+
+_empty_tag_chunks = 0
 
 
 class ChunkTreeChain:
@@ -42,4 +45,9 @@ class ChunkTreeChain:
         result: TreeOutputSchema = self.chain.invoke({"markdown_blocks": markdown_json}, config=config)
         out = result.model_dump()
         out["tree"] = normalize_tree(out["tree"])
+        if not out["tags"]:
+            global _empty_tag_chunks
+            _empty_tag_chunks += 1
+            print("[warn] tags empty for chunk; falling back to []")
+            out["tags"] = fallback_tags_from_tree(out["tree"])
         return out

@@ -121,3 +121,20 @@ def normalize_tree(node: dict) -> dict:
     title = node.get("title") or node.get("root") or "Untitled"
     kids = node.get("children") or node.get("nodes") or []
     return {"title": title, "children": [normalize_tree(c) for c in kids]}
+
+
+def fallback_tags_from_tree(node: Dict, limit: int = 8) -> List[str]:
+    """Derive simple tag candidates by walking the tree titles."""
+    acc: List[str] = []
+
+    def walk(n: Dict) -> None:
+        if len(acc) >= limit:
+            return
+        t = (n.get("title") or "").strip()
+        if t:
+            acc.append(t.lower())
+        for c in n.get("children") or []:
+            walk(c)
+
+    walk(node)
+    return sorted(set(acc))[:limit]
