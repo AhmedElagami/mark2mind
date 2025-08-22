@@ -234,30 +234,36 @@ class StepRunner:
                         "tags": sorted(tag_set),
                     })
 
-                    out_json = self.store.resolve_workspace_path("mindmap.json")
+                    # Filenames based on run_name (e.g., intro → intro.*)
+                    from mark2mind.utils.exporters import to_camel_nospace
+                    base_name = to_camel_nospace(self.cfg.run_name)
+                    json_out_path = self.store.resolve_workspace_path(f"{base_name}.mindmap.json")
+                    markmap_out_path = self.store.resolve_workspace_path(f"{base_name}.markmap.md")
+                    pages_dir = self.store.resolve_workspace_path(base_name)
 
+
+                    # Ensure final_tree.json in DEBUG matches the exported JSON (identical content)
+                    self.store.save_debug("final_tree.json", ctx.final_tree)
+
+                    # Export final tree JSON
+                    self.json_exporter.export_mindmap(ctx.final_tree, json_out_path)
+                    self.console.log(f"✅ Mindmap (final) saved to: {json_out_path}")
+
+                    # Export markmap with Obsidian-friendly links + material pages per node
+                    self.md_exporter.export_markmap_with_node_pages(
+                        tree=ctx.final_tree,
+                        out_md_path=markmap_out_path,
+                        pages_dir=pages_dir,
+                        link_folder_name=base_name,
+                    )
+                    self.console.log(f"✅ Markmap markdown saved to: {markmap_out_path}")
+
+                    # Any “no-refs” or auxiliary variants go into DEBUG only
                     def _strip_content_refs(node: Dict[str, Any]) -> Dict[str, Any]:
                         clean = {k: v for k, v in node.items() if k != "content_refs"}
                         children = clean.get("children") or []
                         clean["children"] = [_strip_content_refs(c) for c in children]
                         return clean
-
-                    # save WITH refs (json)
-                    self.json_exporter.export_mindmap(ctx.final_tree, out_json)
-                    self.console.log(f"✅ Mindmap saved to: {out_json}")
-
-                    # save WITHOUT refs (json)
                     from copy import deepcopy
                     stripped = _strip_content_refs(deepcopy(ctx.final_tree))
-                    out_json_norefs = self.store.resolve_workspace_path("mindmap.norefs.json")
-                    self.store.save_output_json("mindmap.norefs.json", stripped)
-                    self.console.log(f"✅ Mindmap (no content_refs) saved to: {out_json_norefs}")
-
-                    # save WITH refs (markdown)
-                    mm_md = self.store.resolve_workspace_path("mindmap.markmap.md")
-                    self.md_exporter.export_markmap(ctx.final_tree, mm_md)
-
-                    # save WITHOUT refs (markdown)
-                    mm_md_norefs = self.store.resolve_workspace_path("mindmap.norefs.markmap.md")
-                    self.md_exporter.export_markmap(stripped, mm_md_norefs)
-                    self.console.log(f"✅ Mindmap markdown (no content_refs) saved to: {mm_md_norefs}")
+                    self.store.save_debug("mindmap.norefs.json", stripped)

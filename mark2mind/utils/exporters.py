@@ -1,6 +1,17 @@
 from pathlib import Path
 from typing import List, Dict, Any
 import html
+from slugify import slugify
+
+import re
+
+def to_camel_nospace(s: str) -> str:
+    tokens = re.findall(r"[A-Za-z0-9]+", (s or "Untitled"))
+    if not tokens:
+        return "Untitled"
+    # UpperCamelCase: "my cool node" -> "MyCoolNode"
+    return "".join(t.capitalize() for t in tokens)
+
 
 def export_qa_nested_headers(chunks: List[Dict[str, Any]], output_path: str) -> None:
     lines = []
@@ -169,6 +180,87 @@ def export_tree_as_markmap_md(tree: Dict[str, Any], output_path: str) -> None:
     Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"✅ Markmap Markdown saved to: {output_path}")
 
+def _node_slug(node: Dict[str, Any]) -> str:
+    title = _esc(node.get("title") or "Untitled")
+    return to_camel_nospace(title)
+
+
+def _render_node_page(node: Dict[str, Any]) -> str:
+    title = _esc(node.get("title") or "Untitled")
+    refs = node.get("content_refs") or []
+    lines: List[str] = [f"# {title}", ""]
+    if not refs:
+        lines.append("> No content refs.")
+        return "\n".join(lines) + "\n"
+    lines.append("## Content")
+    lines.append("")
+    for ref in refs:
+        rtype = (ref.get("type") or "").lower()
+        cap = ref.get("element_caption") or ""
+        if rtype == "qa":
+            q = (ref.get("q") or "").strip()
+            a = (ref.get("a") or "").strip()
+            lines.append(f"### ❓ {q}")
+            if a.startswith("```") or a.startswith("|") or a.startswith("!"):
+                lines.append(a)
+            else:
+                lines.append(a)
+            lines.append("")
+        else:
+            if cap:
+                lines.append(f"### {cap}")
+            md = (ref.get("markdown") or "").strip()
+            if md:
+                lines.append(md)
+            lines.append("")
+    return "\n".join(lines) + "\n"
+
+def export_tree_as_markmap_md_with_links_and_pages(
+    tree: Dict[str, Any],
+    markmap_md_path: str,
+    pages_dir: str,
+    link_folder_name: str,
+):
+    """
+    Produces:
+      - markmap MD where nodes with content are links: [Title](<link_folder_name>/<node>.md)
+      - for those nodes, writes <pages_dir>/<node>.md with their content_refs rendered
+    """
+    lines: List[str] = []
+    pages_root = Path(pages_dir)
+    pages_root.mkdir(parents=True, exist_ok=True)
+
+    def walk(node: Dict[str, Any], depth: int):
+        indent = "  " * depth
+        title = _esc(node.get("title") or "Untitled")
+        has_refs = bool(node.get("content_refs"))
+        if depth == 0:
+            # top-level heading (Markmap root)
+            if has_refs:
+                slug = _node_slug(node)
+                rel = f"{link_folder_name}/{slug}.md"
+                lines.append(f"# [{title}]({rel})")
+            else:
+                lines.append(f"# {title}")
+        else:
+            if has_refs:
+                slug = _node_slug(node)
+                rel = f"{link_folder_name}/{slug}.md"
+                lines.append(f"{indent}- [{title}]({rel})")
+            else:
+                lines.append(f"{indent}- {title}")
+
+        # If this node has refs, emit its page
+        if has_refs:
+            page_path = pages_root / f"{_node_slug(node)}.md"
+            page_path.write_text(_render_node_page(node), encoding="utf-8")
+
+        for child in node.get("children", []) or []:
+            walk(child, depth + 1)
+
+    walk(tree, 0)
+    Path(markmap_md_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"✅ Markmap (linked) saved to: {markmap_md_path}")
 def normalize_newlines(s: str) -> str:
     """
     Normalize newlines and strip BOM if present.

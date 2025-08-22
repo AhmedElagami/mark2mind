@@ -70,7 +70,7 @@ class TracingConfig(BaseModel):
 
 
 class RuntimeConfig(BaseModel):
-    force: bool = False
+    force: bool = True
     debug: bool = False
     executor_max_workers: Optional[int] = 24
     min_delay_sec: float = 0.15
