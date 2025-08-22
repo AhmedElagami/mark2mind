@@ -11,6 +11,7 @@ from ..core.executor_provider import ExecutorProvider
 from mark2mind.chains.map_content_mindmap_chain import ContentMappingChain
 from mark2mind.chains.map_content_mindmap_qa_chain import QAContentMappingChain
 from mark2mind.utils.tree_helper import insert_content_refs_into_tree
+from mark2mind.config_schema import _warn
 
 class MapContentStage:
     FINAL_TREE_ARTIFACT = "final_tree.json"
@@ -166,38 +167,50 @@ class MapContentStage:
         # QA mapping
         qa_mapped_ids: set[str] = set()
         if qa_blocks:
-            total_q = len(qa_blocks)
-            batch_size_q = self._choose_batch_size(total_q, map_batch_override)
-            num_batches_q = math.ceil(total_q / batch_size_q)
-            batches_q = [(i // batch_size_q, qa_blocks[i:i+batch_size_q]) for i in range(0, total_q, batch_size_q)]
-            task_q = progress.start(
-                f"Mapping Q&A (≈{batch_size_q}, {num_batches_q} batches)", total=num_batches_q
-            )
-
-            def run_batch_qa(payload: Tuple[int, List[Dict]]):
-                bidx, items = payload
-                chain = self._make_chain_qa()
-                mapped = self.retryer.call(chain.invoke, ctx.final_tree, items, config={"meta": f"map:qa:{bidx+1}/{num_batches_q}"})
-                mapped = [m for m in mapped if m.get("element_id") and m.get("target_node_id")]
-                return (bidx, mapped)
-
-            results_by_batch_q: Dict[int, List[Dict]] = {}
-            with executor.get() as pool:
-                futs = {pool.submit(run_batch_qa, item): item[0] for item in batches_q}
-                for fut in as_completed(futs):
-                    bidx, mapped = fut.result()
-                    results_by_batch_q[bidx] = mapped
-                    progress.advance(task_q)
-
-            for i in range(num_batches_q):
-                mapped_all.extend(results_by_batch_q.get(i, []))
-                for m in results_by_batch_q.get(i, []):
-                    if m.get("element_id"):
-                        qa_mapped_ids.add(m["element_id"])
-            progress.finish(task_q)
-
-            # coverage + unmapped reporting
+            remaining_qa = list(qa_blocks)
+            attempt = 0
+            max_attempts = 3 if qa_only else 1
             all_qa_ids = {b["element_id"] for b in qa_blocks if b.get("element_id")}
+            while remaining_qa and attempt < max_attempts:
+                attempt += 1
+                total_q = len(remaining_qa)
+                batch_size_q = self._choose_batch_size(total_q, map_batch_override)
+                num_batches_q = math.ceil(total_q / batch_size_q)
+                batches_q = [(i // batch_size_q, remaining_qa[i:i+batch_size_q]) for i in range(0, total_q, batch_size_q)]
+                suffix = f" (retry {attempt-1})" if attempt > 1 else ""
+                task_q = progress.start(
+                    f"Mapping Q&A (≈{batch_size_q}, {num_batches_q} batches){suffix}", total=num_batches_q
+                )
+
+                def run_batch_qa(payload: Tuple[int, List[Dict]]):
+                    bidx, items = payload
+                    chain = self._make_chain_qa()
+                    mapped = self.retryer.call(
+                        chain.invoke,
+                        ctx.final_tree,
+                        items,
+                        config={"meta": f"map:qa:{attempt}:{bidx+1}/{num_batches_q}"},
+                    )
+                    mapped = [m for m in mapped if m.get("element_id") and m.get("target_node_id")]
+                    return (bidx, mapped)
+
+                results_by_batch_q: Dict[int, List[Dict]] = {}
+                with executor.get() as pool:
+                    futs = {pool.submit(run_batch_qa, item): item[0] for item in batches_q}
+                    for fut in as_completed(futs):
+                        bidx, mapped = fut.result()
+                        results_by_batch_q[bidx] = mapped
+                        progress.advance(task_q)
+
+                for i in range(num_batches_q):
+                    mapped_all.extend(results_by_batch_q.get(i, []))
+                    for m in results_by_batch_q.get(i, []):
+                        if m.get("element_id"):
+                            qa_mapped_ids.add(m["element_id"])
+                progress.finish(task_q)
+
+                remaining_qa = [b for b in qa_blocks if b.get("element_id") not in qa_mapped_ids]
+
             unmapped = sorted(all_qa_ids - qa_mapped_ids)
             store.save_debug("map_qa_coverage.json", {
                 "total_questions": len(all_qa_ids),
@@ -206,6 +219,8 @@ class MapContentStage:
                 "coverage_pct": (len(qa_mapped_ids) / len(all_qa_ids) * 100.0) if all_qa_ids else 100.0,
             })
             store.save_debug("map_unmapped_qa.json", [{"element_id": eid} for eid in unmapped])
+            if qa_only and unmapped:
+                _warn(f"{len(unmapped)} Q&A items remain unmapped after {max_attempts} attempts.")
 
         if not mapped_all:
             store.save_debug(self.FINAL_TREE_ARTIFACT, ctx.final_tree)
