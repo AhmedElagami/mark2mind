@@ -1,17 +1,20 @@
 @echo off
 setlocal
 
-@REM REM Optional: set your API key here so the EXE inherits it
-@REM REM set DEEPSEEK_API_KEY=...
-@pip install nuitka ordered-set zstandard dill pefile pywin32
+REM Optional: set your API key here so the EXE inherits it
+REM set DEEPSEEK_API_KEY=...
 
+REM Ensure required packages are available
+python -m pip install --upgrade pip
+pip install --upgrade nuitka ordered-set zstandard dill pefile pywin32
+pip install -e .
 
-REM Clean old build
+REM Clean old build artifacts
 if exist build rmdir /s /q build
 
 python -m nuitka ^
-  --onefile ^
   --standalone ^
+  --onefile ^
   --output-dir=build ^
   --output-filename=mark2mind.exe ^
   --include-data-dir=mark2mind\prompts=mark2mind\prompts ^
