@@ -25,8 +25,9 @@ class Retryer:
             try:
                 self._rate_limit_pause()
                 return fn(*args, **kwargs)
-            except Exception:
+            except Exception as e:
                 if attempt == self.max_retries:
                     raise
+                print(f"[retry] attempt {attempt} failed: {type(e).__name__}: {e}")
                 backoff = min(2 ** (attempt - 1), 8) + random.uniform(0, 0.25)
                 time.sleep(backoff)
