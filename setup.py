@@ -23,6 +23,7 @@ setup(
         "semchunk",
         "toml",
         "markdownify",
+        "transformers"
     ],
     entry_points={
         "console_scripts": [
