@@ -30,9 +30,10 @@ class BulletsStage:
             progress: ProgressReporter,
             *,
             executor: ExecutorProvider,   # ← accept executor like other stages
-            force: bool) -> RunContext:
+            use_debug_io: bool,
+        ) -> RunContext:
 
-        if not force:
+        if use_debug_io:
             loaded = store.load_debug(self.ARTIFACT)
             if loaded is not None:
                 setattr(ctx, "bullets_outputs", loaded)

@@ -59,7 +59,7 @@ max_retries  = 3
 
 [runtime]
 # Execution controls.
-force                = false         # re-run even if cached
+use_debug_io         = true          # use cached artifacts if available
 debug                = true          # extra debug behavior in some stages
 executor_max_workers = 24            # parallel workers
 min_delay_sec        = 1             # min delay between LLM requests

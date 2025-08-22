@@ -143,7 +143,7 @@ max_tokens = 8000
 
 [runtime]
 debug = true
-force = false
+use_debug_io = true
 executor_max_workers = 24
 min_delay_sec = 1
 ```

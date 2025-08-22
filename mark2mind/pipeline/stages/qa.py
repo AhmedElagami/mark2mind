@@ -26,8 +26,16 @@ class QAStage:
             "qa_a": AnswerQuestionsChain(llm, callbacks=self.callbacks),
         }
 
-    def run(self, ctx: RunContext, store: ArtifactStore, progress: ProgressReporter, *, executor: ExecutorProvider, force: bool) -> RunContext:
-        if not force:
+    def run(
+        self,
+        ctx: RunContext,
+        store: ArtifactStore,
+        progress: ProgressReporter,
+        *,
+        executor: ExecutorProvider,
+        use_debug_io: bool,
+    ) -> RunContext:
+        if use_debug_io:
             loaded = store.load_debug(self.ARTIFACT)
             if loaded is not None:
                 ctx.chunks = loaded

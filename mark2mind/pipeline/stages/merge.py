@@ -59,8 +59,16 @@ class MergeStage:
 
         return trees[0] if trees else None
 
-    def run(self, ctx: RunContext, store: ArtifactStore, progress: ProgressReporter, *, executor: ExecutorProvider, force: bool) -> RunContext:
-        if not force:
+    def run(
+        self,
+        ctx: RunContext,
+        store: ArtifactStore,
+        progress: ProgressReporter,
+        *,
+        executor: ExecutorProvider,
+        use_debug_io: bool,
+    ) -> RunContext:
+        if use_debug_io:
             loaded = store.load_debug(self.ARTIFACT)
             if loaded is not None:
                 ctx.cluster_trees = loaded
