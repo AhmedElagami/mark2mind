@@ -139,24 +139,21 @@ flags = [
     f"--output-dir={BUILD_DIR}",
     f"--output-filename={OUTNAME}",
 
-    # include your app data
+    # data
     "--include-data-dir=mark2mind/prompts=mark2mind/prompts",
     "--include-data-dir=mark2mind/recipes=mark2mind/recipes",
     "--include-package-data=mark2mind",
     "--include-data-dir=vendor_models/gpt2=vendor_models/gpt2",
 
-    # include runtime packages that need native or data files
+    # runtime pkgs (use import names)
     "--include-package=tokenizers",
     "--include-package=huggingface_hub",
-    "--include-package=scikit_learn",
     "--include-package=sklearn",
     "--include-package=numpy",
     "--include-package=scipy",
+    "--include-package=semchunk",
 
-    # optional vendored tokenizer
-    # "--include-data-dir=vendor_models/gpt2=vendor_models/gpt2",
-
-    # trim unused heavy backends
+    # trim unused backends
     "--nofollow-import-to=dask",
     "--nofollow-import-to=scipy._lib.array_api_compat.dask",
     "--nofollow-import-to=sklearn.externals.array_api_compat.dask",
@@ -168,6 +165,7 @@ flags = [
 
     "--assume-yes-for-downloads",
 ]
+
 if ONEFILE:
     flags.append("--onefile")
 
