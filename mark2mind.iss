@@ -5,7 +5,7 @@
 [Setup]
 AppId={{A5D7C9B2-6B54-4D3F-9D65-6E0D7B1C3E21}}
 AppName=mark2mind
-AppVersion=0.1.0                                
+AppVersion=0.1.0
 AppPublisher=Ahmed Elagami
 DefaultDirName={userappdata}\mark2mind
 DefaultGroupName=mark2mind
@@ -16,21 +16,36 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
-; Per-user by default
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-; Let Inno broadcast env var changes automatically
 ChangesEnvironment=yes
 UninstallDisplayIcon={app}\mark2mind.exe
 MinVersion=8.0.0
-
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-; << EDIT THIS >> point Source to your built PyInstaller exe
-Source: "dist\mark2mind.exe"; DestDir: "{app}"; Flags: ignoreversion
+; EXE
+Source: "dist\mark2mind\mark2mind.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+; Copy EVERYTHING else from onedir root except the EXE and special dirs
+Source: "dist\mark2mind\*"; \
+  Excludes: "_internal\*;vendor_models\*;mark2mind.exe"; \
+  DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; _internal payload (prompts, recipes, etc.)
+Source: "dist\mark2mind\_internal\*"; \
+  DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs; \
+  Check: DirExists(ExpandConstant('{src}\dist\mark2mind\_internal'))
+
+; vendor_models next to EXE (preferred)
+Source: "dist\mark2mind\vendor_models\*"; \
+  DestDir: "{app}\vendor_models"; Flags: ignoreversion recursesubdirs createallsubdirs; \
+  Check: DirExists(ExpandConstant('{src}\dist\mark2mind\vendor_models'))
+
+
+
 
 [Icons]
 Name: "{group}\mark2mind"; Filename: "{app}\mark2mind.exe"
@@ -41,25 +56,21 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Registry]
 ; Store DEEPSEEK_API_KEY under current user; removed on uninstall
-; Only write it if user provided a non-empty value
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "DEEPSEEK_API_KEY"; \
   ValueData: "{code:GetApiKey}"; Flags: uninsdeletevalue; Check: HasApiKey
 
-; PATH is modified from [Code]
-
 [Run]
-; Optionally open a README or run a quick smoke test after install
-; Filename: "{cmd}"; Parameters: "/C ""{app}\mark2mind.exe --help & pause"""; Flags: nowait postinstall skipifsilent unchecked
+; Optional smoke test after install (leave commented if not needed)
+; Filename: "{cmd}"; Parameters: "/C ""\"{app}\mark2mind.exe\" --help & pause"""; \
+;   Flags: nowait postinstall skipifsilent unchecked
 
 [Code]
 // ---- Helpers & Wizard page ----
-
 var
   ApiPage: TInputQueryWizardPage;
 
 procedure InitializeWizard;
 begin
-  { Create a page to collect DEEPSEEK_API_KEY }
   ApiPage := CreateInputQueryPage(wpSelectTasks,
     'DeepSeek API Key',
     'Enter your DEEPSEEK_API_KEY',
@@ -78,8 +89,6 @@ begin
 end;
 
 // ---- PATH manipulation (per-user HKCU\Environment\Path) ----
-
-// Some Inno versions may not expose PosEx; include a safe helper.
 function PosEx(const SubStr, S: string; Offset: Integer): Integer;
 var
   T: string;
@@ -108,7 +117,6 @@ end;
 
 procedure WriteUserPath(const Value: string);
 begin
-  { Prefer expand string; fall back to plain string if not supported }
   if not RegWriteExpandStringValue(HKCU, 'Environment', 'Path', Value) then
     RegWriteStringValue(HKCU, 'Environment', 'Path', Value);
 end;
@@ -131,7 +139,7 @@ begin
   else if not PathContains(AppDir) then
     P := P + ';' + AppDir
   else
-    Exit; { already present }
+    Exit;
   WriteUserPath(P);
 end;
 
@@ -158,7 +166,6 @@ begin
     I := PosEx(';', P, StartPos);
   end;
 
-  { add the last segment after the final semicolon }
   Part := Copy(P, StartPos, Length(P) - StartPos + 1);
   if (CompareText(Trim(Part), Trim(AppDir)) <> 0) and (Trim(Part) <> '') then
   begin
@@ -170,14 +177,11 @@ begin
 end;
 
 // ---- Install / Uninstall hooks ----
-
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
-    { Add install dir to PATH (per-user) }
     AddToPath(ExpandConstant('{app}'));
-    { No manual broadcast needed; ChangesEnvironment=yes takes care of it }
   end;
 end;
 
@@ -185,8 +189,6 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
   begin
-    { Remove install dir from PATH on uninstall }
     RemoveFromPath(ExpandConstant('{app}'));
-    { No manual broadcast needed }
   end;
 end;

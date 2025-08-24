@@ -1,0 +1,2 @@
+recursive-include mark2mind/recipes *.toml
+recursive-include mark2mind/prompts *.txt

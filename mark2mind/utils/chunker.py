@@ -16,42 +16,36 @@ class HFTokenizerShim:
         return self._tk.encode(text).ids
 
 def _app_dir() -> Path:
-    # Works in normal Python and frozen exe
+    # Frozen: keep next to the EXE
     if getattr(sys, "frozen", False):
         return Path(sys.argv[0]).resolve().parent
-    return Path(__file__).resolve().parent
+    # Source: package root (one level up from utils/)
+    return Path(__file__).resolve().parents[1]
 
 def _safe_name(repo_id: str) -> str:
     return repo_id.replace("/", "__")
 
-def load_tokenizer_offline(tokenizer_name: str) -> HFTokenizerShim:
-    """
-    Offline-only: look for vendored tokenizer first, then optional shared dir.
-    Never touches the network.
-    """
-    # 1) vendored next to the app: vendor_models/<safe_name>/tokenizer.json
+from huggingface_hub import hf_hub_download
+
+def load_tokenizer(tokenizer_name: str) -> HFTokenizerShim:
     safe = _safe_name(tokenizer_name)
     cand = _app_dir() / "vendor_models" / safe / "tokenizer.json"
     if cand.exists():
         return HFTokenizerShim(Tokenizer.from_file(str(cand)))
 
-    # 2) optional shared directory via env MARK2MIND_MODELS_DIR
     base_env = os.getenv("MARK2MIND_MODELS_DIR")
     if base_env:
         cand2 = Path(base_env) / safe / "tokenizer.json"
         if cand2.exists():
             return HFTokenizerShim(Tokenizer.from_file(str(cand2)))
 
-    raise FileNotFoundError(
-        f"Offline tokenizer not found. Expected at "
-        f"{_app_dir() / 'vendor_models' / safe / 'tokenizer.json'} "
-        f"or {base_env}\\{safe}\\tokenizer.json"
-    )
+    # --- fallback online fetch ---
+    path = hf_hub_download(repo_id=tokenizer_name, filename="tokenizer.json")
+    return HFTokenizerShim(Tokenizer.from_file(path))
 
 
 from markdown_it import MarkdownIt
 from slugify import slugify
-import uuid
 
 def _normalize_for_id(s: str) -> str:
     """
@@ -278,7 +272,7 @@ def fallback_semantic_split(text, tokenizer, max_tokens):
     return sem_chunker(text)
 
 def chunk_markdown(md_text: str, max_tokens: int = 2000, tokenizer_name: str = "gpt2", debug=False, debug_dir=Path("debug")) -> List[dict]:
-    tokenizer = load_tokenizer_offline(tokenizer_name)
+    tokenizer = load_tokenizer(tokenizer_name)
 
     chunks = []
     current_chunk = []
