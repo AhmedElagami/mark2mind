@@ -69,16 +69,17 @@ mark2mind --list-recipes
 
 ### Built-in Recipes
 
-| Recipe                           | Preset             | What it Does                                                               |
-| -------------------------------- | ------------------ | -------------------------------------------------------------------------- |
-| `mindmap_from_markdown`          | `mindmap`          | Chunk → Tree → Cluster → Merge → Refine → Mindmap                          |
+| Recipe                       | Preset            | What it Does                                                       |
+|------------------------------|-------------------|--------------------------------------------------------------------|
+| `mindmap_from_markdown`      | `mindmap`         | Chunk → Tree → Cluster → Merge → Refine → Mindmap                  |
 | `detailed_mindmap_from_markdown` | `detailed_mindmap` | Same as above + `map` stage (attaches content/code/tables/images to nodes) |
-| `qa_from_markdown`               | `qa`               | Chunk text, then generate Q\&A per block                                   |
-| `outline_markdown`               | `bullets`          | Bullet-point outline of Markdown                                           |
-| `reformat_markdown`              | `reformat`         | Rewrites Markdown into cleaner prose                                       |
-| `focus_markdown`                 | `clean_for_map`    | Simplifies Markdown for easier mapping                                     |
-| `list_notes_in_dir`              | `subs_list`        | Collect subtitles (.srt, .vtt, .html) into a manifest                      |
-| `merge_notes_from_manifest`      | `subs_merge`       | Merge subtitle manifest into a Markdown transcript                         |
+| `mindmap_from_qa`            | `mindmap_from_qa` | Parse Q&A Markdown and build a mindmap with Q&A attached to nodes  |
+| `qa_from_markdown`           | `qa`              | Chunk text, then generate Q&A per block                            |
+| `outline_markdown`           | `bullets`         | Bullet-point outline of Markdown                                   |
+| `reformat_markdown`          | `reformat`        | Rewrites Markdown into cleaner prose                               |
+| `focus_markdown`             | `clean_for_map`   | Simplifies Markdown for easier mapping                             |
+| `list_notes_in_dir`          | `subs_list`       | Collect subtitles (.srt, .vtt, .html) into a manifest              |
+| `merge_notes_from_manifest`  | `subs_merge`      | Merge subtitle manifest into a Markdown transcript                 |
 
 Aliases also exist, e.g. `list_subtitles_in_dir → list_notes_in_dir`.
 
@@ -100,6 +101,7 @@ You can override stages manually with `--steps`.
 | `refine`        | Refine & assign stable IDs to tree                                 |
 | `map`           | Map original content (code, tables, images, paragraphs) into nodes |
 | `qa`            | Generate questions & answers per block                             |
+| `qa_parse`     | Parse Q&A markdown into blocks for mapping                         |
 | `bullets`       | Turn chunks into bullet lists                                      |
 | `reformat`      | Reformat raw Markdown                                              |
 | `clean_for_map` | Simplify Markdown for mapping                                      |
@@ -171,6 +173,16 @@ mark2mind --recipe qa_from_markdown --input notes/kubernetes.md
 ```
 
 → Output: `output/kubernetes/qa.md`
+
+---
+
+### Build a mindmap from Q&A Markdown
+
+```bash
+mark2mind --recipe mindmap_from_qa --input notes/qa.md
+```
+
+→ Output: `output/qa/mindmap.markmap.md`
 
 ---
 
