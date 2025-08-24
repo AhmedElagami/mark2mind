@@ -6,9 +6,8 @@ import re
 import os
 from pathlib import Path
 from typing import List
-from huggingface_hub import snapshot_download
-from tokenizers import Tokenizer
-from pathlib import Path
+import sys
+from tokenizers import Tokenizer 
 
 class HFTokenizerShim:
     def __init__(self, tk: Tokenizer):
@@ -16,16 +15,39 @@ class HFTokenizerShim:
     def encode(self, text: str):
         return self._tk.encode(text).ids
 
-def load_tokenizer(tokenizer_name: str) -> HFTokenizerShim:
-    allow = [
-        "tokenizer.json", "vocab.json", "vocab.txt", "merges.txt",
-        "tokenizer_config.json", "special_tokens_map.json"
-    ]
-    local_dir = snapshot_download(tokenizer_name, allow_patterns=allow)
-    tok_json = Path(local_dir) / "tokenizer.json"
-    if not tok_json.exists():
-        raise FileNotFoundError(f"No tokenizer.json found in {local_dir}")
-    return HFTokenizerShim(Tokenizer.from_file(str(tok_json)))
+def _app_dir() -> Path:
+    # Works in normal Python and frozen exe
+    if getattr(sys, "frozen", False):
+        return Path(sys.argv[0]).resolve().parent
+    return Path(__file__).resolve().parent
+
+def _safe_name(repo_id: str) -> str:
+    return repo_id.replace("/", "__")
+
+def load_tokenizer_offline(tokenizer_name: str) -> HFTokenizerShim:
+    """
+    Offline-only: look for vendored tokenizer first, then optional shared dir.
+    Never touches the network.
+    """
+    # 1) vendored next to the app: vendor_models/<safe_name>/tokenizer.json
+    safe = _safe_name(tokenizer_name)
+    cand = _app_dir() / "vendor_models" / safe / "tokenizer.json"
+    if cand.exists():
+        return HFTokenizerShim(Tokenizer.from_file(str(cand)))
+
+    # 2) optional shared directory via env MARK2MIND_MODELS_DIR
+    base_env = os.getenv("MARK2MIND_MODELS_DIR")
+    if base_env:
+        cand2 = Path(base_env) / safe / "tokenizer.json"
+        if cand2.exists():
+            return HFTokenizerShim(Tokenizer.from_file(str(cand2)))
+
+    raise FileNotFoundError(
+        f"Offline tokenizer not found. Expected at "
+        f"{_app_dir() / 'vendor_models' / safe / 'tokenizer.json'} "
+        f"or {base_env}\\{safe}\\tokenizer.json"
+    )
+
 
 from markdown_it import MarkdownIt
 from slugify import slugify
@@ -256,7 +278,7 @@ def fallback_semantic_split(text, tokenizer, max_tokens):
     return sem_chunker(text)
 
 def chunk_markdown(md_text: str, max_tokens: int = 2000, tokenizer_name: str = "gpt2", debug=False, debug_dir=Path("debug")) -> List[dict]:
-    tokenizer = load_tokenizer(tokenizer_name)
+    tokenizer = load_tokenizer_offline(tokenizer_name)
 
     chunks = []
     current_chunk = []
