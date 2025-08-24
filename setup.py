@@ -23,8 +23,15 @@ setup(
         "semchunk",
         "toml",
         "markdownify",
-        "transformers"
+        "tokenizers",
+        "huggingface_hub",
     ],
+    extras_require={
+        "dev": [
+            "pytest",
+            "pyinstaller",
+        ]
+    },
     entry_points={
         "console_scripts": [
             "mark2mind=mark2mind.main:main",

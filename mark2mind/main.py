@@ -9,12 +9,6 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-os.environ["TRANSFORMERS_NO_AVAILABLE_BACKENDS"] = "1"
-os.environ.setdefault("TRANSFORMERS_NO_TORCH", "1")
-os.environ.setdefault("TRANSFORMERS_NO_TF", "1")
-os.environ.setdefault("TRANSFORMERS_NO_FLAX", "1")
-os.environ.setdefault("TRANSFORMERS_NO_JAX", "1")
-os.environ.setdefault("TRANSFORMERS_NO_AVAILABLE_BACKENDS", "1")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
 from mark2mind.config_schema import _derive_run_name, load_config, AppConfig
