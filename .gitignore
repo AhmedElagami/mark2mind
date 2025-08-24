@@ -72,3 +72,4 @@ coverage.xml
 
 paths.txt
 cleaned.txt
+vendor_models/
