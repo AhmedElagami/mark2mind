@@ -6,3 +6,4 @@ from .merge import MergeStage
 from .refine import RefineStage
 from .map_content import MapContentStage
 from .qa_from_markdown import QAFromMarkdownStage
+from .import_markmap import ImportMarkmapStage

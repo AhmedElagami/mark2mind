@@ -29,6 +29,7 @@ from .stages import (
     RefineStage,
     MapContentStage,
     QAFromMarkdownStage,
+    ImportMarkmapStage,
 )
 from .export import MarkdownExporter, JSONExporter
 
@@ -95,6 +96,7 @@ class StepRunner:
         self.subs_list_stage = SubtitlesListStage()
         self.subs_merge_stage = SubtitlesMergeStage()
         self.qa_from_md_stage = QAFromMarkdownStage()
+        self.import_markmap_stage = ImportMarkmapStage()
 
         self.md_exporter = MarkdownExporter()
         self.json_exporter = JSONExporter()
@@ -262,6 +264,15 @@ class StepRunner:
                     ctx,
                     self.store,
                     progress,
+                    use_debug_io=self.cfg.use_debug_io,
+                )
+
+            if "import_markmap" in self.cfg.steps:
+                ctx = self.import_markmap_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    markmap_path=str(self.cfg.markmap_input_path) if self.cfg.markmap_input_path else None,
                     use_debug_io=self.cfg.use_debug_io,
                 )
 

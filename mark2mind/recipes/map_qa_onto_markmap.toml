@@ -1,0 +1,22 @@
+# FILE: mark2mind/mark2mind/recipes/map_qa_onto_markmap.toml
+# Map a QA markdown file onto an existing Markmap tree
+[pipeline]
+steps = ["qa_parse","import_markmap","map"]
+
+[io]
+output_dir = "output"
+debug_dir  = "debug"
+
+[chunk]
+tokenizer_name = "gpt2"
+max_tokens     = 1024
+overlap_tokens = 0
+
+[llm]
+provider     = "deepseek"
+model        = "deepseek-chat"
+api_key_env  = "DEEPSEEK_API_KEY"
+temperature  = 0.3
+max_tokens   = 8192
+timeout      = 1000000
+max_retries  = 3

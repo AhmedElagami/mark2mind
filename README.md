@@ -74,6 +74,7 @@ mark2mind --list-recipes
 | `mindmap_from_markdown`      | `mindmap`         | Chunk → Tree → Cluster → Merge → Refine → Mindmap                  |
 | `detailed_mindmap_from_markdown` | `detailed_mindmap` | Same as above + `map` stage (attaches content/code/tables/images to nodes) |
 | `mindmap_from_qa`            | `mindmap_from_qa` | Parse Q&A Markdown and build a mindmap with Q&A attached to nodes  |
+| `map_qa_onto_markmap`        | `map_qa_onto_markmap` | Map Q&A onto an existing Markmap                                   |
 | `qa_from_markdown`           | `qa`              | Chunk text, then generate Q&A per block                            |
 | `outline_markdown`           | `bullets`         | Bullet-point outline of Markdown                                   |
 | `reformat_markdown`          | `reformat`        | Rewrites Markdown into cleaner prose                               |
@@ -183,6 +184,16 @@ mark2mind --recipe mindmap_from_qa --input notes/qa.md
 ```
 
 → Output: `output/qa/mindmap.markmap.md`
+
+---
+
+### Map Q&A onto an existing Markmap
+
+```bash
+mark2mind --recipe map_qa_onto_markmap --input-markmap mindmap.md --input-qa qa.md --run-name MyTopic
+```
+
+→ Output: `output/MyTopic/MyTopic.mindmap.json`
 
 ---
 

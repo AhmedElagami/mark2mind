@@ -34,6 +34,8 @@ class IOConfig(BaseModel):
     """
     # Main entry: file or directory (mode is inferred)
     input: Optional[str] = None
+    # Optional extra input for importing an existing Markmap
+    markmap_input: Optional[str] = None
 
     # Workspace roots; all artifacts write under <output_dir>/<run_name>/
     output_dir: str = "output"
@@ -94,6 +96,7 @@ class PresetsConfig(BaseModel):
         "subs_list": ["subs_list"],
         "subs_merge": ["subs_merge"],
         "mindmap_from_qa": ["chunk", "tree", "cluster", "merge", "refine", "qa_parse", "map"],
+        "map_qa_onto_markmap": ["qa_parse", "import_markmap", "map"],
     }
 
 
