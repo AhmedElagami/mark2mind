@@ -30,6 +30,7 @@ from .stages import (
     MapContentStage,
     QAFromMarkdownStage,
     ImportMarkmapStage,
+    EnrichMarkmapNotesStage,
 )
 from .export import MarkdownExporter, JSONExporter
 
@@ -97,6 +98,7 @@ class StepRunner:
         self.subs_merge_stage = SubtitlesMergeStage()
         self.qa_from_md_stage = QAFromMarkdownStage()
         self.import_markmap_stage = ImportMarkmapStage()
+        self.enrich_notes_stage = EnrichMarkmapNotesStage(self.llm_pool, self.retryer, callbacks=callbacks)  # ← add
 
         self.md_exporter = MarkdownExporter()
         self.json_exporter = JSONExporter()
@@ -276,6 +278,15 @@ class StepRunner:
                     use_debug_io=self.cfg.use_debug_io,
                 )
 
+            if "enrich_markmap_notes" in self.cfg.steps:
+                ctx = self.enrich_notes_stage.run(
+                    ctx,
+                    self.store,
+                    progress,
+                    use_debug_io=self.cfg.use_debug_io,
+                    executor=self.executor,
+                )
+
             if "map" in self.cfg.steps:
                 ctx = self.map_stage.run(
                     ctx,
@@ -286,6 +297,7 @@ class StepRunner:
                     map_batch_override=self.cfg.map_batch_override,
                 )
 
+            if "map" in self.cfg.steps or "enrich_markmap_notes" in self.cfg.steps:
                 if ctx.final_tree:
                     # aggregate tags from chunk results
                     tag_set = {t for r in ctx.chunk_results for t in r.get("tags", [])}

@@ -1,0 +1,19 @@
+You are selecting learning prerequisites for a single note. Choose 0–5 items that should be read first. Prefer close siblings and nearby ancestors. Avoid cycles and descendants. Output strictly the chosen IDs in order.
+
+TARGET:
+{id: "<id>", title: "{title}", path: "{path}", summary: "{summary}"}
+
+CANDIDATES:
+{candidates_json}
+
+GRAPH_CHILDREN:
+{graph_children_json}
+
+Select 0–5 prerequisite IDs for TARGET that should be read first.
+Rules:
+- No self, no descendant.
+- Prefer siblings and nearby ancestors.
+- Order from most foundational to least.
+
+Return JSON array of IDs only, e.g.:
+["id_a","id_b"]

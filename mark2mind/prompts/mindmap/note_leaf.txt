@@ -1,0 +1,16 @@
+You write Obsidian-ready Markdown. Strict section order. No duplication beyond this node. Use wikilinks [[Full/Path|Alias]]. Be concise and exact. No frontmatter. No HTML.
+
+TITLE: {node_title}
+PATH: {node_path}
+PARENT: {parent_path}
+
+Write the following sections in this exact order:
+{required_sections}
+
+Rules:
+- Teach this topic end-to-end.
+- Prefer generic, version-stable guidance.
+- Use wikilinks for references to other notes, format [[{path}]].
+- Do not include YAML frontmatter.
+
+Output: Markdown only, starting with "# {node_title}" then the sections.

@@ -1,0 +1,19 @@
+You write Obsidian-ready Markdown. Strict section order. No duplication beyond this node. Use wikilinks [[Full/Path|Alias]]. Be concise and exact. No frontmatter. No HTML.
+Do not restate child internals. Link or transclude.
+
+TITLE: {node_title}
+PATH: {node_path}
+
+Children:
+{children_digest}
+
+Write the following sections in this exact order:
+{required_sections}
+
+Rules:
+- Do not repeat options, flags, or procedures from children.
+- Prefer comparisons, decisions, and workflows.
+- In "Children" section, include a bullet for each direct child with a wikilink.
+{transclusion_hint}
+
+Output: Markdown only, starting with "# {node_title}" then the sections.

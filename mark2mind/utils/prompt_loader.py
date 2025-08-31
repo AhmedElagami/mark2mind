@@ -9,12 +9,15 @@ BUILTIN_PROMPTS = {
     "merge_tree":   "prompts/mindmap/mindmap_merger.txt",
     "refine_tree":  "prompts/mindmap/mindmap_refiner.txt",
     "map_content":  "prompts/mindmap/content_mapper.txt",
-    "map_content_qa":"prompts/mindmap/content_mapper_qa.txt",  # NEW
+    "map_content_qa":"prompts/mindmap/content_mapper_qa.txt",
     "qa_generate":  "prompts/qa/generate_questions.txt",
     "qa_answer":    "prompts/qa/answer_questions.txt",
     "format_bullets":"prompts/format/format_bullets.txt",
     "reformat_text":"prompts/format/reformat_text.txt",
     "clean_for_map":"prompts/format/clean_for_map.txt",
+    "note_leaf":    "prompts/mindmap/note_leaf.txt",       # ← add
+    "note_branch":  "prompts/mindmap/note_branch.txt",     # ← add
+    "prereq_pick":  "prompts/mindmap/prereq_pick.txt",     # ← add
 }
 
 _PROMPT_FILE_OVERRIDES: dict[str, str] = {}
