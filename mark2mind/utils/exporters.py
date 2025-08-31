@@ -188,7 +188,22 @@ def _node_slug(node: Dict[str, Any]) -> str:
 def _render_node_page(node: Dict[str, Any]) -> str:
     title = _esc(node.get("title") or "Untitled")
     refs = node.get("content_refs") or []
-    lines: List[str] = [f"# {title}", ""]
+    lines: List[str] = []
+    # frontmatter passthrough: if first ref begins with YAML block, put it at top
+    if refs:
+        md0 = (refs[0].get("markdown") or "")
+        if md0.lstrip().startswith("---\n"):
+            # extract YAML block
+            fm_end = md0.find("\n---", 4)
+            if fm_end != -1:
+                fm_block = md0[:fm_end+4].strip()
+                rest = md0[fm_end+4:].lstrip("\n")
+                lines.append(fm_block)
+                lines.append("")  # spacer
+                # replace the first ref body with the remainder (without YAML header)
+                refs[0]["markdown"] = rest
+    lines.append(f"# {title}")
+    lines.append("")
     if not refs:
         lines.append("> No content refs.")
         return "\n".join(lines) + "\n"

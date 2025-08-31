@@ -15,9 +15,9 @@ CANONICAL: Dict[str, str] = {
     "reformat_markdown": "reformat_markdown.toml",
     "focus_markdown": "focus_markdown.toml",
     "outline_markdown": "outline_markdown.toml",
-    # NEW:
     "mindmap_from_qa": "mindmap_from_qa.toml",
     "map_qa_onto_markmap": "map_qa_onto_markmap.toml",
+    "enrich_markmap_notes": "enrich_markmap_notes.toml",   # ← add
 }
 
 ALIASES: Dict[str, str] = {

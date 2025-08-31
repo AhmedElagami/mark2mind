@@ -7,3 +7,4 @@ from .refine import RefineStage
 from .map_content import MapContentStage
 from .qa_from_markdown import QAFromMarkdownStage
 from .import_markmap import ImportMarkmapStage
+from .enrich_notes import EnrichMarkmapNotesStage   # ← add
