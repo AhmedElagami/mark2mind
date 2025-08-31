@@ -1,2 +1,3 @@
-recursive-include mark2mind/recipes *.toml
 recursive-include mark2mind/prompts *.txt
+recursive-include mark2mind/recipes *.toml
+recursive-include mark2mind/vendor_models *

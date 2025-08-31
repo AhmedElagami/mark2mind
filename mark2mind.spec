@@ -1,20 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import os
-from glob import glob
 from PyInstaller.utils.hooks import (
+    collect_all,
     collect_dynamic_libs,
     collect_submodules,
     copy_metadata,
 )
 
 # ----- paths -----
-HERE = os.getcwd()                                  # dir you run pyinstaller from
+HERE = os.getcwd()
 PKG_ROOT = os.path.join(HERE, "mark2mind")
-VM_ROOT  = os.path.join(PKG_ROOT, "vendor_models")  # vendored models inside package
+VM_ROOT  = os.path.join(PKG_ROOT, "vendor_models")
 
 def dir_to_datas(src_dir, prefix):
-    """Return list[(abs_src, rel_dest)] for all files under src_dir."""
     pairs = []
     if not os.path.isdir(src_dir):
         return pairs
@@ -28,10 +27,8 @@ def dir_to_datas(src_dir, prefix):
 
 # ----- datas -----
 datas = []
-# package-local data under _internal/mark2mind/...
 datas += dir_to_datas(os.path.join(PKG_ROOT, "prompts"), "_internal/mark2mind/prompts")
 datas += dir_to_datas(os.path.join(PKG_ROOT, "recipes"), "_internal/mark2mind/recipes")
-# vendored models NEXT TO exe: dist/mark2mind/vendor_models/...
 datas += dir_to_datas(VM_ROOT, "vendor_models")
 
 # package metadata
@@ -45,14 +42,17 @@ datas += copy_metadata("huggingface_hub")
 binaries = []
 hiddenimports = []
 
-# only native libs for numpy/scipy; DO NOT include their submodules
-binaries += collect_dynamic_libs("numpy")
-binaries += collect_dynamic_libs("scipy")
+# pull EVERYTHING for numpy + scipy (fixes sklearn -> scipy.stats at runtime)
+for pkg in ("numpy", "scipy"):
+    d, b, h = collect_all(pkg)
+    datas += d
+    binaries += b
+    hiddenimports += h
 
-# sklearn needs its python submodules
+# sklearn python modules
 hiddenimports += collect_submodules("sklearn")
 
-# tokenizers has a rust/native ext + python modules
+# tokenizers: native + python
 binaries += collect_dynamic_libs("tokenizers")
 hiddenimports += collect_submodules("tokenizers")
 
@@ -72,7 +72,7 @@ a = Analysis(
     hooksconfig={},
     excludes=excludes,
     noarchive=False,
-    optimize=0,
+    optimize=0,   # keep 0 or 1; avoid 2
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
@@ -81,7 +81,7 @@ exe = EXE(
     pyz,
     a.scripts,
     [],
-    exclude_binaries=True,   # onedir: place DLLs next to the exe
+    exclude_binaries=True,
     name="mark2mind",
     debug=False,
     bootloader_ignore_signals=False,
