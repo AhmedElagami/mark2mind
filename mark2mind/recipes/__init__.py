@@ -17,6 +17,7 @@ CANONICAL: Dict[str, str] = {
     "outline_markdown": "outline_markdown.toml",
     # NEW:
     "mindmap_from_qa": "mindmap_from_qa.toml",
+    "map_qa_onto_markmap": "map_qa_onto_markmap.toml",
 }
 
 ALIASES: Dict[str, str] = {

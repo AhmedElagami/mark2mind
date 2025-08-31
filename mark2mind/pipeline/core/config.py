@@ -21,6 +21,7 @@ class RunConfig:
     run_name: str
     input_path: Path
     is_dir_mode: bool
+    markmap_input_path: Optional[Path] = None
 
     debug_root: Path = Path("debug")
     output_root: Path = Path("output")
@@ -51,11 +52,13 @@ class RunConfig:
 
         input_path = Path(app.io.input)
         is_dir_mode = input_path.is_dir()
+        markmap_input = Path(app.io.markmap_input) if app.io.markmap_input else None
 
         return cls(
             run_name=app.io.run_name or input_path.stem,
             input_path=input_path,
             is_dir_mode=is_dir_mode,
+            markmap_input_path=markmap_input,
             debug_root=Path(app.io.debug_dir),
             output_root=Path(app.io.output_dir),
             steps=steps,

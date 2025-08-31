@@ -42,6 +42,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Common overrides
     p.add_argument("--input", dest="input_override", type=str, help="Override [io].input")
+    p.add_argument("--input-qa", dest="input_qa", type=str, help="QA markdown input (for map_qa_onto_markmap)")
+    p.add_argument("--input-markmap", dest="input_markmap", type=str, help="Existing Markmap markdown to import")
     p.add_argument("--run-name", dest="run_name_override", type=str, help="Override [io].run_name")
     p.add_argument("--output-dir", type=str, help="Override [io].output_dir")
     p.add_argument("--debug-dir", type=str, help="Override [io].debug_dir")
@@ -114,6 +116,10 @@ def main():
     # Overrides
     if args.input_override:
         app.io.input = args.input_override
+    if args.input_qa:
+        app.io.input = args.input_qa
+    if args.input_markmap:
+        app.io.markmap_input = args.input_markmap
     # ✅ validate now, after overrides
     if not app.io.input:
         raise ValueError(
@@ -123,6 +129,14 @@ def main():
     input_path = Path(app.io.input)
     if not input_path.exists():
         raise FileNotFoundError(f"Input path not found: {app.io.input}")
+
+    need_markmap = "import_markmap" in app.pipeline.steps
+    if need_markmap and not app.io.markmap_input:
+        raise ValueError("Missing Markmap input. Use --input-markmap")
+    if app.io.markmap_input:
+        markmap_path = Path(app.io.markmap_input)
+        if not markmap_path.exists():
+            raise FileNotFoundError(f"Markmap input not found: {app.io.markmap_input}")
 
     if not app.io.run_name:
         app.io.run_name = _derive_run_name(input_path)
