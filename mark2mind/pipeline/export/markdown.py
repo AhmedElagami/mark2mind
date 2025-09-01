@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from slugify import slugify
 
 class MarkdownExporter:
@@ -35,6 +35,7 @@ class MarkdownExporter:
         out_md_path: Path,
         pages_dir: Path,
         link_folder_name: str,
+        progress: Optional[Any] = None,
     ):
         """
         - Writes <file_name>.markmap.md with links like: [Node](<file_name>/<node>.md)
@@ -48,4 +49,5 @@ class MarkdownExporter:
             markmap_md_path=str(out_md_path),
             pages_dir=str(pages_dir),
             link_folder_name=link_folder_name,
+            progress=progress,
         )

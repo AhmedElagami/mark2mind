@@ -240,41 +240,51 @@ class EnrichMarkmapNotesStage:
                 progress.advance(t)
             progress.finish(t)
 
-        # pick prereqs per leaf
+        # parallelize prereq selection for leaves with progress
         graph_children_json = json.dumps(graph_children)
-        for nid in ids:
-            if self._node_type(nid, depth_map, graph_children) != "leaf":
-                continue
-            target = {
-                "id": nid,
-                "title": next(x["node"] for x in nodes if x["id"]==nid).get("title","Untitled"),
-                "path": path_str[nid],
-                "summary": summaries.get(nid,"")[:480]
-            }
-            # build candidate pool
-            parent = graph_parent.get(nid)
-            siblings = [s for s in (graph_children.get(parent,[]) if parent else []) if s != nid]
-            grandparent = graph_parent.get(parent) if parent else None
-            cousins = []
-            if grandparent:
-                for sib_parent in graph_children.get(grandparent, []):
-                    cousins.extend([c for c in graph_children.get(sib_parent, []) if c not in graph_children.get(nid,[])])
-            candidates = list(dict.fromkeys([*siblings, *cousins]))[:30]
-            cand_objs = [
-                {"id": cid, "title": next(x["node"] for x in nodes if x["id"]==cid).get("title","Untitled"),
-                 "path": path_str[cid], "summary": summaries.get(cid,"")[:480]}
-                for cid in candidates if cid != nid
-            ]
-            chosen = self.retryer.call(
-                prereq_chain.invoke,
-                target=target,
-                candidates_json=json.dumps(cand_objs, ensure_ascii=False),
-                graph_children_json=graph_children_json
-            )
-            # validate
-            chosen = [c for c in chosen if c in ids and c != nid and c not in set(graph_children.get(nid,[]))][:5]
-            target_node = next(x["node"] for x in nodes if x["id"]==nid)
-            target_node["_prereq_ids"] = chosen
+        leaf_ids_for_prereq = [nid for nid in ids if self._node_type(nid, depth_map, graph_children) == "leaf"]
+        if leaf_ids_for_prereq:
+            task = progress.start("Picking prerequisites", total=len(leaf_ids_for_prereq))
+
+            def _build_and_pick(nid: str) -> tuple[str, list[str]]:
+                target = {
+                    "id": nid,
+                    "title": next(x["node"] for x in nodes if x["id"]==nid).get("title","Untitled"),
+                    "path": path_str[nid],
+                    "summary": summaries.get(nid,"")[:480]
+                }
+                parent = graph_parent.get(nid)
+                siblings = [s for s in (graph_children.get(parent,[]) if parent else []) if s != nid]
+                grandparent = graph_parent.get(parent) if parent else None
+                cousins: list[str] = []
+                if grandparent:
+                    for sib_parent in graph_children.get(grandparent, []):
+                        cousins.extend([c for c in graph_children.get(sib_parent, []) if c not in graph_children.get(nid,[])])
+                candidates = list(dict.fromkeys([*siblings, *cousins]))[:30]
+                cand_objs = [
+                    {"id": cid,
+                     "title": next(x["node"] for x in nodes if x["id"]==cid).get("title","Untitled"),
+                     "path": path_str[cid],
+                     "summary": summaries.get(cid,"")[:480]}
+                    for cid in candidates if cid != nid
+                ]
+                picked = self.retryer.call(
+                    prereq_chain.invoke,
+                    target=target,
+                    candidates_json=json.dumps(cand_objs, ensure_ascii=False),
+                    graph_children_json=graph_children_json
+                )
+                picked = [c for c in picked if c in ids and c != nid and c not in set(graph_children.get(nid,[]))][:5]
+                return nid, picked
+
+            from concurrent.futures import as_completed
+            with executor.get() as pool:
+                futs = [pool.submit(_build_and_pick, nid) for nid in leaf_ids_for_prereq]
+                for f in as_completed(futs):
+                    nid, chosen = f.result()
+                    next(x["node"] for x in nodes if x["id"]==nid)["_prereq_ids"] = chosen
+                    progress.advance(task)
+            progress.finish(task)
 
         # See-also selection: siblings → parent → cousins (excluding prereqs)
         see_also_ids: dict[str, list[str]] = {}

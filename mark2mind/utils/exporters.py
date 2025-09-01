@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import html
 from slugify import slugify
 
@@ -235,6 +235,7 @@ def export_tree_as_markmap_md_with_links_and_pages(
     markmap_md_path: str,
     pages_dir: str,
     link_folder_name: str,
+    progress: Optional[Any] = None,
 ):
     """
     Produces:
@@ -244,6 +245,16 @@ def export_tree_as_markmap_md_with_links_and_pages(
     lines: List[str] = []
     pages_root = Path(pages_dir)
     pages_root.mkdir(parents=True, exist_ok=True)
+
+    def _count_nodes(n: Dict[str, Any]) -> int:
+        return 1 + sum(_count_nodes(c) for c in (n.get("children") or []))
+
+    task = None
+    total = None
+    if progress is not None:
+        total = _count_nodes(tree)
+        task = progress.start("Exporting node pages", total=total)
+    emitted = 0
 
     def walk(node: Dict[str, Any], depth: int):
         indent = "  " * depth
@@ -265,10 +276,14 @@ def export_tree_as_markmap_md_with_links_and_pages(
             else:
                 lines.append(f"{indent}- {title}")
 
-        # If this node has refs, emit its page
         if has_refs:
             page_path = pages_root / f"{_node_slug(node)}.md"
             page_path.write_text(_render_node_page(node), encoding="utf-8")
+
+        nonlocal emitted, task
+        emitted += 1
+        if task is not None:
+            progress.advance(task)
 
         for child in node.get("children", []) or []:
             walk(child, depth + 1)
@@ -276,6 +291,8 @@ def export_tree_as_markmap_md_with_links_and_pages(
     walk(tree, 0)
     Path(markmap_md_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"✅ Markmap (linked) saved to: {markmap_md_path}")
+    if task is not None and total is not None:
+        progress.finish(task)
 def normalize_newlines(s: str) -> str:
     """
     Normalize newlines and strip BOM if present.
