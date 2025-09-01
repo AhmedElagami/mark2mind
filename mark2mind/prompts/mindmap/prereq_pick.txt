@@ -1,19 +1,30 @@
-You are selecting learning prerequisites for a single note. Choose 0–5 items that should be read first. Prefer close siblings and nearby ancestors. Avoid cycles and descendants. Output strictly the chosen IDs in order.
+System:
+You are selecting learning prerequisites for a single note inside a mindmap.
+Return strictly a JSON array of node IDs only.
 
-TARGET:
-{id: "<id>", title: "{title}", path: "{path}", summary: "{summary}"}
+Constraints:
+- 0 to 5 results.
+- No self, no descendants (use GRAPH_CHILDREN).
+- Prefer siblings, then nearby ancestors, then basics.
+- Order by conceptual foundation to advanced.
+- Never invent IDs.
 
-CANDIDATES:
+User:
+TARGET
+ID: {id}
+TITLE: {title}
+PATH: {path}
+SUMMARY: {summary}
+
+CANDIDATES_JSON
 {candidates_json}
 
-GRAPH_CHILDREN:
+GRAPH_CHILDREN_JSON
 {graph_children_json}
 
-Select 0–5 prerequisite IDs for TARGET that should be read first.
-Rules:
-- No self, no descendant.
-- Prefer siblings and nearby ancestors.
-- Order from most foundational to least.
+Task:
+Select up to 5 prerequisite IDs for TARGET.
 
-Return JSON array of IDs only, e.g.:
+Return:
+JSON array only, e.g.:
 ["id_a","id_b"]
