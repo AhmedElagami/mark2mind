@@ -162,6 +162,7 @@ class StepRunner:
             # File-based pipelines
             self._ensure_file_mode()
             text = self.cfg.input_path.read_text(encoding="utf-8")
+            base_name = to_camel_nospace(self.cfg.run_name)
             ctx = RunContext(text=text)
 
             if "chunk" in self.cfg.steps:
@@ -287,6 +288,7 @@ class StepRunner:
                     progress,
                     use_debug_io=self.cfg.use_debug_io,
                     executor=self.executor,
+                    link_folder_name=base_name,
                 )
 
             if "map" in self.cfg.steps:

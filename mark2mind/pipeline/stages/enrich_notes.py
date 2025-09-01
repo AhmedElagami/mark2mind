@@ -39,6 +39,9 @@ class EnrichMarkmapNotesStage:
         self.retryer = retryer
         self.callbacks = callbacks
 
+    def _link_path(self, slug: str, folder: str | None) -> str:
+        return f"{folder}/{slug}.md" if folder else f"{slug}.md"
+
     def _walk(self, root: Dict) -> Tuple[List[Dict], Dict[str,str], Dict[str,List[str]], Dict[str,str], Dict[str,List[str]]]:
         # returns (nodes list), title path map, children graph, parent graph, depth lists
         order: List[Dict] = []
@@ -117,19 +120,22 @@ class EnrichMarkmapNotesStage:
         # allowed maps lower(slug) -> CanonicalSlug
         def repl(m: re.Match) -> str:
             raw = m.group(1).strip()
-            target = raw.split("|", 1)[0].split("/", 1)[0]
-            k = target.lower()
+            lhs = raw.split("|", 1)[0]
+            alias = raw.split("|", 1)[1] if "|" in raw else None
+            # take last path segment, drop trailing .md if present
+            base = lhs.split("/")[-1]
+            if base.lower().endswith(".md"):
+                base = base[:-3]
+            k = base.lower()
             if k in allowed:
-                canon = allowed[k]
-                alias = None
-                if "|" in raw:
-                    alias = raw.split("|", 1)[1]
+                canon = allowed[k]  # already "Folder/Slug.md"
                 return f"[[{canon}|{alias}]]" if alias else f"[[{canon}]]"
             return raw
 
+
         return re.sub(r"\[\[([^\]]+)\]\]", lambda m: repl(m), body)
 
-    def run(self, ctx: RunContext, store: ArtifactStore, progress: ProgressReporter, *, use_debug_io: bool, executor: ExecutorProvider) -> RunContext:
+    def run(self, ctx: RunContext, store: ArtifactStore, progress: ProgressReporter, *, use_debug_io: bool, executor: ExecutorProvider, link_folder_name: str | None = None) -> RunContext:
         if not ctx.final_tree:
             return ctx
 
@@ -143,8 +149,13 @@ class EnrichMarkmapNotesStage:
             n = item["node"]
             id2slug[item["id"]] = node_slug(n.get("title"))
         allowed_links_list = sorted(id2slug.values())
-        allowed_links = {s.lower(): s for s in allowed_links_list}
+        # map lower(slug) -> canonical "Folder/Slug.md"
+        allowed_links = {
+            s.lower(): (f"{link_folder_name}/{s}.md" if link_folder_name else f"{s}.md")
+            for s in allowed_links_list
+        }
         allowed_links_str = ", ".join(allowed_links_list)
+
 
         levels = self._levels(ids, depth_map)
         llm = self.llm_pool.get()
@@ -277,7 +288,6 @@ class EnrichMarkmapNotesStage:
                 picked = [c for c in picked if c in ids and c != nid and c not in set(graph_children.get(nid,[]))][:5]
                 return nid, picked
 
-            from concurrent.futures import as_completed
             with executor.get() as pool:
                 futs = [pool.submit(_build_and_pick, nid) for nid in leaf_ids_for_prereq]
                 for f in as_completed(futs):
@@ -315,10 +325,11 @@ class EnrichMarkmapNotesStage:
             n = next(x["node"] for x in nodes if x["id"]==nid)
             ntype = self._node_type(nid, depth_map, graph_children)
             parent_id = graph_parent.get(nid)
-            parent_link = self._wikilink(id2slug[parent_id]) if parent_id else None
-            child_links = [self._wikilink(id2slug[c]) for c in graph_children.get(nid, [])]
-            prereq_links = [self._wikilink(id2slug[p]) for p in (n.get("_prereq_ids") or [])]
-            see_also_links = [self._wikilink(id2slug[s]) for s in see_also_ids.get(nid, [])]
+            parent_link = self._link_path(id2slug[parent_id], link_folder_name) if parent_id else None
+            child_links = [self._link_path(id2slug[c], link_folder_name) for c in graph_children.get(nid, [])]
+            prereq_links = [self._link_path(id2slug[p], link_folder_name) for p in (n.get("_prereq_ids") or [])]
+            see_also_links = [self._link_path(id2slug[s], link_folder_name) for s in see_also_ids.get(nid, [])]
+
             fm = self._mk_frontmatter(
                 node_id=nid,
                 ntype=ntype,
@@ -337,17 +348,32 @@ class EnrichMarkmapNotesStage:
             dv_see = (
                 "## See also\n"
                 "```dataviewjs\n"
-                "const L = dv.current().see_also ?? [];\n"
-                "if (L.length) dv.list(L);\n"
+                "// Render clickable links from frontmatter `see_also`\n"
+                "const items = dv.current().see_also ?? [];\n"
+                "const uniq = dv.array(items).distinct(i => i?.path ?? i);\n"
+                "if (uniq.length) {\n"
+                "  dv.list(uniq.map(i => `[[${i}]]`));\n"
+                "} else {\n"
+                "  dv.paragraph(\"None\");\n"
+                "}\n"
                 "```\n\n"
             )
+
             dv_pre = (
                 "## Pre-reqs\n"
                 "```dataviewjs\n"
-                "const P = dv.current().prereqs ?? [];\n"
-                "if (P.length) dv.list(P);\n"
+                "// Render clickable prereqs from frontmatter `prereqs`\n"
+                "const items = dv.current().prereqs ?? [];\n"
+                "const uniq = dv.array(items).distinct(i => i?.path ?? i);\n"
+                "if (uniq.length) {\n"
+                "  dv.list(uniq.map(i => `[[${i}]]`));\n"
+                "} else {\n"
+                "  dv.paragraph(\"None\");\n"
+                "}\n"
                 "```\n\n"
             )
+
+
             synthetic = f"{fm}\n{dv_see}{dv_pre}{body}"
             # ensure only one synthetic note ref and keep existing refs
             refs = n.setdefault("content_refs", [])
