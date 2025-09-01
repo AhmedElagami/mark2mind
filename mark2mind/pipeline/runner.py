@@ -41,6 +41,8 @@ from mark2mind.chains.map_content_mindmap_chain import ContentMappingChain
 from mark2mind.chains.generate_questions_chain import GenerateQuestionsChain
 from mark2mind.chains.answer_questions_chain import AnswerQuestionsChain
 from mark2mind.pipeline.stages.bullets import BulletsStage
+from mark2mind.utils.exporters import to_camel_nospace
+from mark2mind.utils.validate_links import validate_pages
 
 class StepRunner:
     def __init__(
@@ -343,6 +345,7 @@ class StepRunner:
                         out_md_path=markmap_out_path,
                         pages_dir=pages_dir,
                         link_folder_name=base_name,
+                        progress=progress,
                     )
                     self.console.log(f"✅ Markmap markdown saved to: {markmap_out_path}")
                     # Link validator
