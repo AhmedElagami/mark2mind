@@ -3,7 +3,10 @@ from pathlib import Path
 
 
 def collect_wikilinks(text: str) -> set[str]:
-    raw = {m.group(1).split("|", 1)[0] for m in re.finditer(r"\[\[([^\]]+)\]\]", text)}
+    # Ignore fenced code blocks ```...``` and inline code `...`
+    stripped = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    stripped = re.sub(r"`[^`]*`", "", stripped)
+    raw = {m.group(1).split("|", 1)[0] for m in re.finditer(r"\[\[([^\]]+)\]\]", stripped)}
     # take last path segment and strip .md
     norm = set()
     for r in raw:

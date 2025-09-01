@@ -240,13 +240,7 @@ class EnrichMarkmapNotesStage:
                 )
                 # store in summaries optionally blank
                 summaries[nid] = summaries.get(nid,"")
-                n.setdefault("content_refs", []).append({
-                    "element_id": f"note::{nid}",
-                    "type": "paragraph",
-                    "element_caption": "Teaching note",
-                    "markdown": "",  # frontmatter+body injected later
-                    "created_at": datetime.utcnow().isoformat(timespec="seconds")+"Z",
-                })
+                # Do not pre-seed an empty "Teaching note" ref for branches
                 n["_generated_body"] = self._fix_wikilinks(body, allowed_links)
                 progress.advance(t)
             progress.finish(t)
@@ -360,7 +354,7 @@ class EnrichMarkmapNotesStage:
             )
 
             dv_pre = (
-                "## Pre-reqs\n"
+                "## Prereqs\n"
                 "```dataviewjs\n"
                 "// Render clickable prereqs from frontmatter `prereqs`\n"
                 "const items = dv.current().prereqs ?? [];\n"
@@ -373,15 +367,15 @@ class EnrichMarkmapNotesStage:
                 "```\n\n"
             )
 
-
-            synthetic = f"{fm}\n{dv_see}{dv_pre}{body}"
+            # Frontmatter, then body, then DV sections at the end
+            synthetic = f"{fm}\n{body}\n\n{dv_pre}{dv_see}"
             # ensure only one synthetic note ref and keep existing refs
             refs = n.setdefault("content_refs", [])
             # put synthetic first
             refs.insert(0, {
                 "element_id": f"note::{nid}",
                 "type": "paragraph",
-                "element_caption": "Teaching note",
+                "element_caption": "",  # no wrapper title
                 "markdown": synthetic,
                 "created_at": datetime.utcnow().isoformat(timespec="seconds")+"Z",
             })

@@ -202,13 +202,16 @@ def _render_node_page(node: Dict[str, Any]) -> str:
                 lines.append("")  # spacer
                 # replace the first ref body with the remainder (without YAML header)
                 refs[0]["markdown"] = rest
-    lines.append(f"# {title}")
-    lines.append("")
+    # Add a single H1 only if the first ref does not already start with the same H1
+    first_md = (refs[0].get("markdown") or "").lstrip() if refs else ""
+    first_line = first_md.splitlines()[0].strip() if first_md else ""
+    has_same_h1 = first_line.startswith("#") and first_line[1:].strip().lower() == title.lower()
+    if not has_same_h1:
+        lines.append(f"# {title}")
+        lines.append("")
     if not refs:
         lines.append("> No content refs.")
         return "\n".join(lines) + "\n"
-    lines.append("## Content")
-    lines.append("")
     for ref in refs:
         rtype = (ref.get("type") or "").lower()
         cap = ref.get("element_caption") or ""
@@ -222,8 +225,9 @@ def _render_node_page(node: Dict[str, Any]) -> str:
                 lines.append(a)
             lines.append("")
         else:
-            if cap:
-                lines.append(f"### {cap}")
+            # Suppress the "Teaching note" subheading wrapper
+            if cap and cap.strip().lower() != "teaching note":
+                lines.append(f"### {cap.strip()}")
             md = (ref.get("markdown") or "").strip()
             if md:
                 lines.append(md)
