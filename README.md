@@ -1,9 +1,22 @@
 # mark2mind
 
-**Semantic mindmap & Q\&A generator for Markdown and subtitles.**
-Built with [LangChain](https://www.langchain.com/) + LLMs.
+> Semantic mind‑map & Q\&A generator for Markdown and subtitles, built with [LangChain](https://www.langchain.com/) and modern LLMs.
 
-Generate:
+[![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#-license)
+
+## Table of Contents
+
+- [Features](#-features)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Using Recipes](#-using-recipes)
+- [Pipeline Stages](#-pipeline-stages)
+- [Configuration](#-config-file-configtoml)
+- [Developer Notes](#-developer-notes)
+- [Examples](#-examples)
+- [License](#-license)
+
+## ✨ Features
 
 * 📌 **Mindmaps** (basic or detailed)
 * ❓ **Q\&A study guides**
@@ -69,19 +82,19 @@ mark2mind --list-recipes
 
 ### Built-in Recipes
 
-| Recipe                       | Preset            | What it Does                                                       |
-|------------------------------|-------------------|--------------------------------------------------------------------|
-| `mindmap_from_markdown`      | `mindmap`         | Chunk → Tree → Cluster → Merge → Refine → Mindmap                  |
+| Recipe                         | Preset            | What it Does                                                      |
+|-------------------------------|-------------------|-------------------------------------------------------------------|
+| `mindmap_from_markdown`       | `mindmap`         | Chunk → Tree → Cluster → Merge → Refine → Mindmap                 |
 | `detailed_mindmap_from_markdown` | `detailed_mindmap` | Same as above + `map` stage (attaches content/code/tables/images to nodes) |
-| `mindmap_from_qa`            | `mindmap_from_qa` | Parse Q&A Markdown and build a mindmap with Q&A attached to nodes  |
-| `map_qa_onto_markmap`        | `map_qa_onto_markmap` | Map Q&A onto an existing Markmap                                   |
-| `qa_from_markdown`           | `qa`              | Chunk text, then generate Q&A per block                            |
-| `outline_markdown`           | `bullets`         | Bullet-point outline of Markdown                                   |
-| `reformat_markdown`          | `reformat`        | Rewrites Markdown into cleaner prose                               |
-| `focus_markdown`             | `clean_for_map`   | Simplifies Markdown for easier mapping                             |
-| `list_notes_in_dir`          | `subs_list`       | Collect subtitles (.srt, .vtt, .html) into a manifest              |
-| `merge_notes_from_manifest`  | `subs_merge`      | Merge subtitle manifest into a Markdown transcript                 |
-
+| `mindmap_from_qa`             | `mindmap_from_qa` | Parse Q&A Markdown and build a mindmap with Q&A attached to nodes |
+| `map_qa_onto_markmap`         | `map_qa_onto_markmap` | Map Q&A onto an existing Markmap                                  |
+| `enrich_markmap_notes`        | `enrich_markmap_notes` | Import a Markmap and add structured teaching notes to nodes       |
+| `qa_from_markdown`            | `qa`              | Chunk text, then generate Q&A per block                           |
+| `outline_markdown`            | `bullets`         | Bullet-point outline of Markdown                                  |
+| `reformat_markdown`           | `reformat`        | Rewrites Markdown into cleaner prose                              |
+| `focus_markdown`              | `clean_for_map`   | Simplifies Markdown for easier mapping                            |
+| `list_notes_in_dir`           | `subs_list`       | Collect subtitles (.srt, .vtt, .html) into a manifest             |
+| `merge_notes_from_manifest`   | `subs_merge`      | Merge subtitle manifest into a Markdown transcript                |
 Aliases also exist, e.g. `list_subtitles_in_dir → list_notes_in_dir`.
 
 ---
