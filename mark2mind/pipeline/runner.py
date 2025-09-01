@@ -324,7 +324,6 @@ class StepRunner:
                     })
 
                     # Filenames based on run_name (e.g., intro → intro.*)
-                    from mark2mind.utils.exporters import to_camel_nospace
                     base_name = to_camel_nospace(self.cfg.run_name)
                     json_out_path = self.store.resolve_workspace_path(f"{base_name}.mindmap.json")
                     markmap_out_path = self.store.resolve_workspace_path(f"{base_name}.markmap.md")
@@ -346,6 +345,13 @@ class StepRunner:
                         link_folder_name=base_name,
                     )
                     self.console.log(f"✅ Markmap markdown saved to: {markmap_out_path}")
+                    # Link validator
+                    problems = validate_pages(pages_dir)
+                    if problems:
+                        self.console.log(f"⚠️ Link check found {len(problems)} issues")
+                        self.store.write_text("link_validation.txt", "\n".join(problems))
+                    else:
+                        self.console.log("✅ All wikilinks resolve to existing pages")
 
                     # Any “no-refs” or auxiliary variants go into DEBUG only
                     def _strip_content_refs(node: Dict[str, Any]) -> Dict[str, Any]:

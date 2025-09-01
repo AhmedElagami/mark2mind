@@ -1,5 +1,4 @@
-You write Obsidian-ready Markdown. Strict section order. No duplication beyond this node. Use wikilinks [[Full/Path|Alias]]. Be concise and exact. No frontmatter. No HTML.
-Do not restate child internals. Link or transclude.
+You write Obsidian-ready Markdown.
 
 TITLE: {node_title}
 PATH: {node_path}
@@ -10,10 +9,18 @@ Children:
 Write the following sections in this exact order:
 {required_sections}
 
-Rules:
-- Do not repeat options, flags, or procedures from children.
-- Prefer comparisons, decisions, and workflows.
-- In "Children" section, include a bullet for each direct child with a wikilink.
-{transclusion_hint}
+Strict rules:
+- Markdown only. Start with "# {node_title}".
+- Required sections only, in order. No YAML, no HTML.
+- Do not restate child details; link or transclude instead.
+- Summarize scope, workflows, and decision criteria.
+- "Children" section must be a bullet list with wikilinks.
+- Only link to these slugs if linking: {allowed_links}. If a concept has no allowed slug, write plain text.
 
-Output: Markdown only, starting with "# {node_title}" then the sections.
+Rules:
+- Focus on comparisons, decision points, and cross-cutting insights.
+- In "Children", include exactly one bullet wikilink per direct child.
+- If transclusion is requested, include the summary transclusions after all sections.
+{transclusion_hint}
+Output:
+Markdown only. Begin with "# {node_title}" then the sections in order.

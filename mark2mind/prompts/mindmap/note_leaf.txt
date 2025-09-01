@@ -1,4 +1,4 @@
-You write Obsidian-ready Markdown. Strict section order. No duplication beyond this node. Use wikilinks [[Full/Path|Alias]]. Be concise and exact. No frontmatter. No HTML.
+You write Obsidian-ready Markdown.
 
 TITLE: {node_title}
 PATH: {node_path}
@@ -7,10 +7,23 @@ PARENT: {parent_path}
 Write the following sections in this exact order:
 {required_sections}
 
-Rules:
-- Teach this topic end-to-end.
-- Prefer generic, version-stable guidance.
-- Use wikilinks for references to other notes, format [[{path}]].
-- Do not include YAML frontmatter.
+Strict rules:
+- Markdown only.
+- Start with "# {node_title}".
+- Use the required sections in exact order, no extras.
+- No YAML frontmatter. No HTML.
+- No repetition across sections.
+- Use wikilinks like [[Full/Path|Alias]].
+- Summary ≤ 80 words, one line. See also ≤ 5 items.
+- Only link to these slugs if linking: {allowed_links}. If a concept has no allowed slug, write plain text.
 
-Output: Markdown only, starting with "# {node_title}" then the sections.
+Rules:
+- Teach this topic independently.
+- Prefer generic, durable knowledge over version-specific flags.
+- In "Checks" provide 2–5 minimal self-tests.
+- In "Failure modes" cover the most likely pitfalls only.
+- Use bullet points where clearer.
+- Do not add or reorder sections.
+
+Output:
+Markdown only. Begin with "# {node_title}" then the sections in the listed order.
