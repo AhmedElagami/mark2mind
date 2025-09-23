@@ -28,7 +28,6 @@ BRANCH_SECTIONS = [
     "Summary",
     "When to use",
     "Decision points",
-    "Children",
 ]
 
 class EnrichMarkmapNotesStage:
@@ -135,6 +134,30 @@ class EnrichMarkmapNotesStage:
 
         return re.sub(r"\[\[([^\]]+)\]\]", lambda m: repl(m), body)
 
+    def _strip_section(self, body: str, heading: str) -> str:
+        pattern = rf"(?ms)^\s*##\s*{re.escape(heading)}\s*\n.*?(?=^\s*##\s|\Z)"
+        return re.sub(pattern, "", body).rstrip()
+
+    def _render_children_section(
+        self,
+        kids: List[str],
+        node_lookup: Dict[str, Dict],
+        id2slug: Dict[str, str],
+        link_folder_name: str | None,
+    ) -> str:
+        if not kids:
+            return ""
+        lines = ["## Children"]
+        for cid in kids:
+            node = node_lookup.get(cid, {})
+            title = (node.get("title") or "Untitled").strip() or "Untitled"
+            target = self._link_path(id2slug[cid], link_folder_name)
+            if target.endswith(".md"):
+                target = target[:-3]
+            alias = title or id2slug[cid]
+            lines.append(f"- [[{target}|{alias}]]")
+        return "\n".join(lines)
+
     def run(self, ctx: RunContext, store: ArtifactStore, progress: ProgressReporter, *, use_debug_io: bool, executor: ExecutorProvider, link_folder_name: str | None = None) -> RunContext:
         if not ctx.final_tree:
             return ctx
@@ -142,6 +165,7 @@ class EnrichMarkmapNotesStage:
         assign_node_ids(ctx.final_tree)
         nodes, title_path, graph_children, graph_parent, depth_map = self._walk(ctx.final_tree)
         ids = [n["id"] for n in nodes]
+        node_lookup: Dict[str, Dict] = {item["id"]: item["node"] for item in nodes}
 
         # Slug index
         id2slug: dict[str, str] = {}
@@ -173,7 +197,7 @@ class EnrichMarkmapNotesStage:
         run_id = getattr(ctx, "run_id", "manual")
 
         def gen_leaf(nid: str) -> Tuple[str, str]:
-            n = next(x["node"] for x in nodes if x["id"] == nid)
+            n = node_lookup[nid]
             required_sections = "\n".join(LEAF_SECTIONS)
             parent_id = graph_parent.get(nid)
             parent_path = path_str[parent_id] if parent_id else ""
@@ -213,7 +237,7 @@ class EnrichMarkmapNotesStage:
                     progress.advance(t)
             progress.finish(t)
             for nid, (body, summary) in results.items():
-                n = next(x["node"] for x in nodes if x["id"] == nid)
+                n = node_lookup[nid]
                 n["_generated_body"] = self._fix_wikilinks(body, allowed_links)
                 summaries[nid] = summary
 
@@ -223,21 +247,28 @@ class EnrichMarkmapNotesStage:
             if not non_leaf: continue
             t = progress.start(f"Generating branches/hubs at depth {depth}", total=len(non_leaf))
             for nid in non_leaf:
-                n = next(x["node"] for x in nodes if x["id"] == nid)
+                n = node_lookup[nid]
                 kids = graph_children.get(nid, [])
                 digest = []
                 for cid in kids:
-                    digest.append(f"- {next(x['node'] for x in nodes if x['id']==cid).get('title','Untitled')} :: [[{path_str[cid]}]] :: {summaries.get(cid,'')}")
-                transclusion_hint = "- After the sections, include one transclusion line per child: ![[{}#Summary]]".format("]]\n![[ ".join(path_str[c] for c in kids)) if kids else ""
+                    child = node_lookup[cid]
+                    digest.append(f"- {child.get('title','Untitled')} :: [[{path_str[cid]}]] :: {summaries.get(cid,'')}")
                 body = self.retryer.call(
                     branch_chain.invoke,
                     node_title=n.get("title") or "Untitled",
                     node_path=path_str[nid],
                     children_digest="\n".join(digest),
                     required_sections="\n".join(BRANCH_SECTIONS),
-                    transclusion_hint=transclusion_hint,
                     allowed_links=allowed_links_str,
                 )
+                body = self._strip_section(body, "Children")
+                child_section = self._render_children_section(kids, node_lookup, id2slug, link_folder_name)
+                if child_section:
+                    body = body.rstrip()
+                    if body:
+                        body = f"{body}\n\n{child_section}"
+                    else:
+                        body = child_section
                 # store in summaries optionally blank
                 summaries[nid] = summaries.get(nid,"")
                 # Do not pre-seed an empty "Teaching note" ref for branches
@@ -254,7 +285,7 @@ class EnrichMarkmapNotesStage:
             def _build_and_pick(nid: str) -> tuple[str, list[str]]:
                 target = {
                     "id": nid,
-                    "title": next(x["node"] for x in nodes if x["id"]==nid).get("title","Untitled"),
+                    "title": node_lookup[nid].get("title","Untitled"),
                     "path": path_str[nid],
                     "summary": summaries.get(nid,"")[:480]
                 }
@@ -268,7 +299,7 @@ class EnrichMarkmapNotesStage:
                 candidates = list(dict.fromkeys([*siblings, *cousins]))[:30]
                 cand_objs = [
                     {"id": cid,
-                     "title": next(x["node"] for x in nodes if x["id"]==cid).get("title","Untitled"),
+                     "title": node_lookup[cid].get("title","Untitled"),
                      "path": path_str[cid],
                      "summary": summaries.get(cid,"")[:480]}
                     for cid in candidates if cid != nid
@@ -286,14 +317,14 @@ class EnrichMarkmapNotesStage:
                 futs = [pool.submit(_build_and_pick, nid) for nid in leaf_ids_for_prereq]
                 for f in as_completed(futs):
                     nid, chosen = f.result()
-                    next(x["node"] for x in nodes if x["id"]==nid)["_prereq_ids"] = chosen
+                    node_lookup[nid]["_prereq_ids"] = chosen
                     progress.advance(task)
             progress.finish(task)
 
         # See-also selection: siblings → parent → cousins (excluding prereqs)
         see_also_ids: dict[str, list[str]] = {}
         for nid in ids:
-            prs = set(next(x["node"] for x in nodes if x["id"] == nid).get("_prereq_ids") or [])
+            prs = set(node_lookup[nid].get("_prereq_ids") or [])
             parent = graph_parent.get(nid)
             sibs = [s for s in (graph_children.get(parent, []) if parent else []) if s != nid]
             order: list[str] = []
@@ -316,7 +347,7 @@ class EnrichMarkmapNotesStage:
 
         # embed frontmatter+body into a single synthetic content_ref per node
         for nid in ids:
-            n = next(x["node"] for x in nodes if x["id"]==nid)
+            n = node_lookup[nid]
             ntype = self._node_type(nid, depth_map, graph_children)
             parent_id = graph_parent.get(nid)
             parent_link = self._link_path(id2slug[parent_id], link_folder_name) if parent_id else None

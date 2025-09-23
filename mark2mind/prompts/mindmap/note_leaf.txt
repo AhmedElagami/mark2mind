@@ -15,7 +15,7 @@ Strict rules:
 - No YAML frontmatter. No HTML.
 - No repetition across sections.
 - Use wikilinks like [[Full/Path|Alias]].
-- Summary ≤ 80 words, one line. See also ≤ 5 items.
+- Summary ≤ 80 words, one line.
 - Only link to these slugs if linking: {allowed_links}. If a concept has no allowed slug, write plain text.
 
 Rules:
