@@ -13,15 +13,13 @@ Write the following sections in this exact order:
 Strict rules:
 - Markdown only. Start with "# {node_title}".
 - Required sections only, in order. No YAML, no HTML.
-- Do not restate child details; link or transclude instead.
+- Do not restate child details; link or reference instead.
 - Summarize scope, workflows, and decision criteria.
-- "Children" section must be a bullet list with wikilinks.
+- Children section is injected automatically; do not create it yourself.
 - Only link to these slugs if linking: {allowed_links}. If a concept has no allowed slug, write plain text.
 
 Rules:
 - Focus on comparisons, decision points, and cross-cutting insights.
-- In "Children", include exactly one bullet wikilink per direct child.
-- If transclusion is requested, include the summary transclusions after all sections.
-{transclusion_hint}
+- Use the child digest to highlight how the subtree differs or when to use each option.
 Output:
 Markdown only. Begin with "# {node_title}" then the sections in order.
