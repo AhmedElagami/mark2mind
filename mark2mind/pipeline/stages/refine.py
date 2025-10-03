@@ -13,6 +13,7 @@ from mark2mind.utils.tree_helper import assign_node_ids
 
 class RefineStage:
     ARTIFACT = "refined_tree.json"
+    requires: list[str] = []
 
     def __init__(self, llm_pool: LLMFactoryPool, retryer: Retryer, callbacks=None):
         self.llm_pool = llm_pool

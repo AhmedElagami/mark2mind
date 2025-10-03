@@ -6,6 +6,7 @@ from ..core.progress import ProgressReporter
 
 class ClusterStage:
     ARTIFACT = "clusters.json"
+    requires: list[str] = []
 
     def run(
         self,

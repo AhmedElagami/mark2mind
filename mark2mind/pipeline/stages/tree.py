@@ -12,6 +12,7 @@ from mark2mind.chains.generate_tree_chain import ChunkTreeChain
 
 class TreeStage:
     ARTIFACT = "chunk_trees.json"
+    requires: list[str] = []
 
     def __init__(self, llm_pool: LLMFactoryPool, retryer: Retryer, callbacks=None):
         self.llm_pool = llm_pool

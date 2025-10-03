@@ -11,6 +11,7 @@ from mark2mind.chains.merge_tree_chain import TreeMergeChain
 
 class MergeStage:
     ARTIFACT = "merged_clusters.json"
+    requires: list[str] = []
 
     def __init__(self, llm_pool: LLMFactoryPool, retryer: Retryer, callbacks=None):
         self.llm_pool = llm_pool

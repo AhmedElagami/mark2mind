@@ -12,6 +12,7 @@ from mark2mind.chains.reformat_text_chain import ReformatTextChain
 
 class ReformatTextStage:
     ARTIFACT = "reformat.json"
+    requires: list[str] = []
 
     def __init__(self,
                  llm_pool: LLMFactoryPool,

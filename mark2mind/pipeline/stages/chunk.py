@@ -7,6 +7,7 @@ from mark2mind.utils.chunker import chunk_markdown
 
 class ChunkStage:
     ARTIFACT = "chunks.json"
+    requires = ["input"]
 
     def run(
         self,

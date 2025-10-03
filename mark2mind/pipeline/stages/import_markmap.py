@@ -13,6 +13,7 @@ class ImportMarkmapStage:
     """Load an existing Markmap markdown file into ctx.final_tree."""
 
     ARTIFACT = "import_markmap_tree.json"
+    requires = ["markmap_input"]
 
     def _parse(self, text: str) -> Dict:
         lines = text.splitlines()
