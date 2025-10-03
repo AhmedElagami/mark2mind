@@ -6,6 +6,7 @@ from mark2mind.utils.qa_parser import parse_qa_markdown
 
 class QAFromMarkdownStage:
     ARTIFACT = "qa_blocks.json"
+    requires = ["input"]
 
     def run(
         self,

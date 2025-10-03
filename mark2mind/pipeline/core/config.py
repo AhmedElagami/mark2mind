@@ -50,7 +50,11 @@ class RunConfig:
             preset_map = app.presets.named or {}
             steps = preset_map.get(app.pipeline.preset, steps)
 
-        input_path = Path(app.io.input)
+        primary_input = app.io.input or app.io.qa_input or app.io.markmap_input
+        if not primary_input:
+            raise ValueError("RunConfig requires at least one input path")
+
+        input_path = Path(primary_input)
         is_dir_mode = input_path.is_dir()
         markmap_input = Path(app.io.markmap_input) if app.io.markmap_input else None
 

@@ -38,6 +38,7 @@ BRANCH_SECTIONS = [
 
 class EnrichMarkmapNotesStage:
     ARTIFACT = "enriched_tree.json"
+    requires = ["markmap_input"]
 
     def __init__(self, llm_pool: LLMFactoryPool, retryer: Retryer, callbacks=None):
         self.llm_pool = llm_pool

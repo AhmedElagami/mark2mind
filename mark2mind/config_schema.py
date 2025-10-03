@@ -34,6 +34,8 @@ class IOConfig(BaseModel):
     """
     # Main entry: file or directory (mode is inferred)
     input: Optional[str] = None
+    # Optional QA markdown input (used for map_qa_onto_markmap etc.)
+    qa_input: Optional[str] = None
     # Optional extra input for importing an existing Markmap
     markmap_input: Optional[str] = None
 

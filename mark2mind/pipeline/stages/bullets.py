@@ -11,6 +11,7 @@ from mark2mind.chains.format_bullets_chain import FormatBulletsChain
 
 class BulletsStage:
     ARTIFACT = "bullets.json"
+    requires: list[str] = []
 
     def __init__(self,
                  llm_pool: LLMFactoryPool,

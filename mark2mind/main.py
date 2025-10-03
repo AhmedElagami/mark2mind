@@ -8,6 +8,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
@@ -18,6 +19,7 @@ from mark2mind.pipeline.core.config import RunConfig
 from mark2mind.pipeline.runner import StepRunner
 from mark2mind.utils.tracing import LocalTracingHandler
 from mark2mind.utils.prompt_loader import set_prompt_file_overrides
+from mark2mind.pipeline.stages import STAGE_REGISTRY
 
 # NEW: allow single entry point to drive built-in recipes, too
 from mark2mind.recipes import get_recipe_names, get_recipe_path
@@ -89,6 +91,69 @@ def load_llm_from_config(app: AppConfig) -> ChatDeepSeek:
     )
 
 
+def _resolve_steps(app: AppConfig) -> list[str]:
+    steps = app.pipeline.steps
+    if app.pipeline.preset:
+        preset_map = app.presets.named or {}
+        steps = preset_map.get(app.pipeline.preset, steps)
+    return steps
+
+
+def validate_inputs(app: AppConfig) -> Path:
+    steps = _resolve_steps(app)
+    required_inputs: set[str] = set()
+    for step in steps:
+        stage_cls = STAGE_REGISTRY.get(step)
+        if not stage_cls:
+            continue
+        requires = getattr(stage_cls, "requires", []) or []
+        required_inputs.update(requires)
+
+    missing: list[str] = []
+    primary_path: Optional[Path] = None
+
+    def ensure_path(value: Optional[str], label: str, *, expect_dir: bool) -> None:
+        nonlocal primary_path
+        if not value:
+            missing.append(label)
+            return
+        path = Path(value)
+        if not path.exists():
+            raise FileNotFoundError(f"{label} not found: {value}")
+        if expect_dir and not path.is_dir():
+            raise ValueError(f"{label} must be a directory: {value}")
+        if not expect_dir and path.is_dir():
+            raise ValueError(f"{label} must be a file: {value}")
+        if primary_path is None:
+            primary_path = path
+
+    if "input_dir" in required_inputs:
+        ensure_path(app.io.input, "--input", expect_dir=True)
+
+    if "input" in required_inputs:
+        ensure_path(app.io.input or app.io.qa_input, "--input", expect_dir=False)
+
+    if "markmap_input" in required_inputs:
+        ensure_path(app.io.markmap_input, "--input-markmap", expect_dir=False)
+
+    if "manifest" in required_inputs and not (app.io.manifest or "").strip():
+        missing.append("[io].manifest or --manifest")
+
+    if missing:
+        raise ValueError("Missing required inputs: " + ", ".join(sorted(set(missing))))
+
+    if primary_path is None:
+        for candidate in (app.io.input, app.io.qa_input, app.io.markmap_input):
+            if candidate:
+                primary_path = Path(candidate)
+                break
+
+    if primary_path is None:
+        raise ValueError("Unable to determine an input path; provide --input or another supported input option.")
+
+    return primary_path
+
+
 def main():
     parser = build_parser()
     import sys
@@ -117,42 +182,28 @@ def main():
     if args.input_override:
         app.io.input = args.input_override
     if args.input_qa:
-        app.io.input = args.input_qa
+        app.io.qa_input = args.input_qa
+        app.io.input = app.io.input or args.input_qa
     if args.input_markmap:
         app.io.markmap_input = args.input_markmap
-    # ✅ validate now, after overrides
-    if not app.io.input:
-        raise ValueError(
-            "Missing input. Use [io].input in config or pass --input."
-        )
-
-    input_path = Path(app.io.input)
-    if not input_path.exists():
-        raise FileNotFoundError(f"Input path not found: {app.io.input}")
-
-    need_markmap = "import_markmap" in app.pipeline.steps
-    if need_markmap and not app.io.markmap_input:
-        raise ValueError("Missing Markmap input. Use --input-markmap")
-    if app.io.markmap_input:
-        markmap_path = Path(app.io.markmap_input)
-        if not markmap_path.exists():
-            raise FileNotFoundError(f"Markmap input not found: {app.io.markmap_input}")
-
-    if not app.io.run_name:
-        app.io.run_name = _derive_run_name(input_path)
-    if args.run_name_override:
-        app.io.run_name = args.run_name_override
-    
-    if args.output_dir:
-        app.io.output_dir = args.output_dir
-    if args.debug_dir:
-        app.io.debug_dir = args.debug_dir
 
     if args.steps:
         app.pipeline.steps = [s.strip() for s in args.steps.split(",") if s.strip()]
         app.pipeline.preset = None
     elif args.preset:
         app.pipeline.preset = args.preset.strip()
+
+    primary_input = validate_inputs(app)
+
+    if not app.io.run_name:
+        app.io.run_name = _derive_run_name(primary_input)
+    if args.run_name_override:
+        app.io.run_name = args.run_name_override
+
+    if args.output_dir:
+        app.io.output_dir = args.output_dir
+    if args.debug_dir:
+        app.io.debug_dir = args.debug_dir
 
     # Prompts: allow per-run file overrides while keeping built-ins bundled
     set_prompt_file_overrides(app.prompts.files.get_map())

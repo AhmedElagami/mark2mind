@@ -13,6 +13,7 @@ from mark2mind.chains.answer_questions_chain import AnswerQuestionsChain
 
 class QAStage:
     ARTIFACT = "chunks_with_qa.json"
+    requires: list[str] = []
 
     def __init__(self, llm_pool: LLMFactoryPool, retryer: Retryer, callbacks=None):
         self.llm_pool = llm_pool

@@ -12,6 +12,7 @@ from ..core.executor_provider import ExecutorProvider
 
 class CleanForMapStage:
     ARTIFACT = "clean_for_map.json"
+    requires: list[str] = []
 
     def __init__(self,
                  llm_pool: LLMFactoryPool,

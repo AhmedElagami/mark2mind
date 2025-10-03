@@ -15,6 +15,7 @@ from mark2mind.config_schema import _warn
 
 class MapContentStage:
     FINAL_TREE_ARTIFACT = "final_tree.json"
+    requires: list[str] = []
 
     def __init__(
         self,

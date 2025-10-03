@@ -12,6 +12,7 @@ class SubtitlesListStage:
     """
     Writes the manifest to the exact path provided by the runner.
     """
+    requires = ["input_dir"]
     def run(
         self,
         ctx: RunContext,
@@ -37,6 +38,7 @@ class SubtitlesMergeStage:
     """
     Consumes manifest and writes a single merged Markdown output.
     """
+    requires = ["input_dir", "manifest"]
     def run(
         self,
         ctx: RunContext,
