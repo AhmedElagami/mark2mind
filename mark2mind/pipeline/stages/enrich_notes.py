@@ -17,18 +17,24 @@ import re
 
 # Required section lists now contain no link lists; Dataview renders links.
 LEAF_SECTIONS = [
-    "Summary",
-    "Why it matters",
-    "Core steps",
-    "Checks",
-    "Failure modes",
-    "Examples",
+    "Summary",         # one-line intro
+    "Key concepts",    # simple definitions (optional)
+    "Why it matters",  # motivation
+    "Core steps",      # step-by-step how-to
+    "Checks",          # self-test
+    "Failure modes",   # common pitfalls
+    "Examples",        # code + real-world
+    "Advanced notes",  # optional deeper dives
 ]
+
 BRANCH_SECTIONS = [
-    "Summary",
-    "When to use",
-    "Decision points",
+    "Summary",          # What Angular is, explained simply first, then technical depth
+    "When to use",      # Situations, industries, and use cases — include real-world analogies
+    "Decision points",  # Trade-offs, comparisons, benefits vs drawbacks
+    "Examples",         # Simple code + real-world analogies (shopping cart, forms, etc.)
+    "Key Takeaways"     # Beginner-friendly recap — must be plain, short, and clear
 ]
+
 
 class EnrichMarkmapNotesStage:
     ARTIFACT = "enriched_tree.json"

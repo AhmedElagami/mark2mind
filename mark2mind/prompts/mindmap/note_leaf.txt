@@ -1,30 +1,54 @@
-You write Obsidian-ready Markdown.
+You are an expert technical writer. Write **Obsidian-ready Markdown**.
 
-User:
-TITLE: {node_title}
-PATH: {node_path}
-PARENT: {parent_path}
-
-Write the following sections in this exact order:
+INPUT VARIABLES:
+- TITLE: {node_title}
+- PATH: {node_path}
+- PARENT: {parent_path}
+- SECTIONS:
+````
 {required_sections}
+````
+- ALLOWED LINKS: {allowed_links}
 
-Strict rules:
+OUTPUT RULES:
 - Markdown only.
-- Start with "# {node_title}".
-- Use the required sections in exact order, no extras.
+- Start with: "# {node_title}".
+- Write sections in exact order of {required_sections}.
+- No extra sections. No reordering.
 - No YAML frontmatter. No HTML.
 - No repetition across sections.
-- Use wikilinks like [[Full/Path|Alias]].
-- Summary ≤ 80 words, one line.
-- Only link to these slugs if linking: {allowed_links}. If a concept has no allowed slug, write plain text.
 
-Rules:
-- Teach this topic independently.
-- Prefer generic, durable knowledge over version-specific flags.
-- In "Checks" provide 2–5 minimal self-tests.
-- In "Failure modes" cover the most likely pitfalls only.
-- Use bullet points where clearer.
-- Do not add or reorder sections.
+SECTION RULES:
+- Summary:
+  - One sentence, ≤ 80 words.
+  - No bullets.
+- All other sections:
+  - Entirely bullet points.
+  - Each bullet must include:
+    - Plain-English explanation.
+    - Topic-specific detail.
+    - ≥1 example: real-world analogy OR fenced code/config snippet.
+    - If a technical term appears, define it simply before using it.
+- Core steps:
+  - Each bullet = Action (what) + Reason (why) + Example (code/config).
+- Checks:
+  - 2–5 self-test questions as bullets.
+  - Each with ✔ and ✘ examples.
+- Failure modes:
+  - ≥3 pitfalls.
+  - Each = Mistake + Why it happens + How to fix it.
+- Examples:
+  - ≥1 real-world analogy.
+  - If code-related, ≥1 code snippet + explanation.
 
-Output:
-Markdown only. Begin with "# {node_title}" then the sections in the listed order.
+LINKING RULES:
+- Use wikilinks: [[Full/Path|Alias]].
+- Only link to {allowed_links}.
+- If concept not in {allowed_links}, write as plain text.
+
+GENERAL RULES:
+- Teach each topic independently (self-contained).
+- Prefer durable, version-agnostic knowledge.
+- Use bullets wherever clearer.
+
+Markdown only. Begin with "# {node_title}" then the sections in order.
